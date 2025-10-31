@@ -1,14 +1,13 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -17,31 +16,28 @@ serve(async (req) => {
     
     console.log(`Webhook handler received ${type} request for notebook ${notebookId}`);
 
-    // Get the webhook URL from Supabase secrets
-    const webhookUrl = Deno.env.get('WEBHOOK_URL');
+    const webhookUrl = Deno.env.get("WEBHOOK_URL");
     if (!webhookUrl) {
-      throw new Error('WEBHOOK_URL not configured');
+      throw new Error("WEBHOOK_URL not configured");
     }
 
-    // Get the auth token from Supabase secrets (same as generate-notebook-content)
-    const authToken = Deno.env.get('NOTEBOOK_GENERATION_AUTH');
+    const authToken = Deno.env.get("NOTEBOOK_GENERATION_AUTH");
     if (!authToken) {
-      throw new Error('NOTEBOOK_GENERATION_AUTH not configured');
+      throw new Error("NOTEBOOK_GENERATION_AUTH not configured");
     }
 
-    // Prepare the webhook payload
     let webhookPayload;
     
-    if (type === 'multiple-websites') {
+    if (type === "multiple-websites") {
       webhookPayload = {
-        type: 'multiple-websites',
+        type: "multiple-websites",
         notebookId,
         urls,
         timestamp
       };
-    } else if (type === 'copied-text') {
+    } else if (type === "copied-text") {
       webhookPayload = {
-        type: 'copied-text',
+        type: "copied-text",
         notebookId,
         title,
         content,
@@ -51,14 +47,13 @@ serve(async (req) => {
       throw new Error(`Unsupported type: ${type}`);
     }
 
-    console.log('Sending webhook payload:', JSON.stringify(webhookPayload, null, 2));
+    console.log("Sending webhook payload:", JSON.stringify(webhookPayload, null, 2));
 
-    // Send to webhook with authentication
     const response = await fetch(webhookUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
         ...corsHeaders
       },
       body: JSON.stringify(webhookPayload)
@@ -66,12 +61,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Webhook request failed:', response.status, errorText);
+      console.error("Webhook request failed:", response.status, errorText);
       throw new Error(`Webhook request failed: ${response.status} - ${errorText}`);
     }
 
     const webhookResponse = await response.text();
-    console.log('Webhook response:', webhookResponse);
+    console.log("Webhook response:", webhookResponse);
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -79,13 +74,13 @@ serve(async (req) => {
       webhookResponse 
     }), {
       headers: { 
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...corsHeaders 
       },
     });
 
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    console.error("Webhook handler error:", error);
     
     return new Response(JSON.stringify({ 
       error: error.message,
@@ -93,7 +88,7 @@ serve(async (req) => {
     }), {
       status: 500,
       headers: { 
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...corsHeaders 
       },
     });
