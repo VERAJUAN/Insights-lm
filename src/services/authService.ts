@@ -13,8 +13,8 @@ export const useLogout = () => {
       await signOut();
       
       toast({
-        title: "Signed out",
-        description: "You have been successfully signed out."
+        title: "Sesióg cerrada",
+        description: "Has cerrado sesión correctamente."
       });
       
       // Redirect to auth page
@@ -25,8 +25,8 @@ export const useLogout = () => {
       
       // Even if there's an error, redirect to auth page
       toast({
-        title: "Signed out",
-        description: "You have been signed out locally.",
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente.",
         variant: "default"
       });
       
