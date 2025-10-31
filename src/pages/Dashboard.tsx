@@ -18,7 +18,7 @@ const Dashboard = () => {
         <DashboardHeader userEmail={user?.email} />
         <main className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
-            <h1 className="text-4xl font-medium text-gray-900 mb-2">Bienvenido a Campus Norte UNC</h1>
+            <h1 className="text-4xl font-medium text-gray-900 mb-2">Bienvenido a CampusLM</h1>
           </div>
           <div className="text-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
