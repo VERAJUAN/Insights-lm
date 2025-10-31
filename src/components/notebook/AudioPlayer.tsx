@@ -19,7 +19,7 @@ interface AudioPlayerProps {
 
 const AudioPlayer = ({ 
   audioUrl, 
-  title = "Deep Dive Conversation", 
+  title = "Conversación profunda", 
   notebookId,
   expiresAt,
   onError,

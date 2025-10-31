@@ -51,31 +51,31 @@ const RenameSourceDialog = ({ open, onOpenChange, source, notebookId }: RenameSo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Rename {source?.title}?</DialogTitle>
+          <DialogTitle>¿Renombrar {source?.title}?</DialogTitle>
           <DialogDescription>
-            Enter a new name for this source.
+            Ingresa un nuevo nombre para esta fuente.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="source-name">Source Name *</Label>
+            <Label htmlFor="source-name">Nombre de la fuente *</Label>
             <Input
               id="source-name"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter source name"
+              placeholder="Ingresa el nombre de la fuente"
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            Cancelar
           </Button>
           <Button 
             onClick={handleSave}
             disabled={!title.trim() || isUpdating}
           >
-            {isUpdating ? 'Saving...' : 'Save'}
+            {isUpdating ? 'Guardando...' : 'Guardar'}
           </Button>
         </DialogFooter>
       </DialogContent>

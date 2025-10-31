@@ -14,7 +14,7 @@ import {
 
 const NotebookGrid = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState('Most recent');
+  const [sortBy, setSortBy] = useState('Más reciente');
   const {
     notebooks,
     isLoading,
@@ -28,7 +28,7 @@ const NotebookGrid = () => {
     
     const sorted = [...notebooks];
     
-    if (sortBy === 'Most recent') {
+    if (sortBy === 'Más reciente') {
       return sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
     } else if (sortBy === 'Title') {
       return sorted.sort((a, b) => a.title.localeCompare(b.title));
@@ -39,7 +39,7 @@ const NotebookGrid = () => {
 
   const handleCreateNotebook = () => {
     createNotebook({
-      title: 'Untitled notebook',
+      title: 'Cuaderno sin título',
       description: ''
     }, {
       onSuccess: data => {
@@ -72,7 +72,7 @@ const NotebookGrid = () => {
   return <div>
       <div className="flex items-center justify-between mb-8">
         <Button className="bg-black hover:bg-gray-800 text-white rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
-          {isCreating ? 'Creating...' : '+ Create new'}
+          {isCreating ? 'Creando...' : '+ Crear nuevo'}
         </Button>
         
         <div className="flex items-center space-x-4">
@@ -84,13 +84,13 @@ const NotebookGrid = () => {
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setSortBy('Most recent')} className="flex items-center justify-between">
-                Most recent
-                {sortBy === 'Most recent' && <Check className="h-4 w-4" />}
+              <DropdownMenuItem onClick={() => setSortBy('Más reciente')} className="flex items-center justify-between">
+                Más reciente
+                {sortBy === 'Más reciente' && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy('Title')} className="flex items-center justify-between">
-                Title
-                {sortBy === 'Title' && <Check className="h-4 w-4" />}
+              <DropdownMenuItem onClick={() => setSortBy('Título')} className="flex items-center justify-between">
+                Título
+                {sortBy === 'Título' && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

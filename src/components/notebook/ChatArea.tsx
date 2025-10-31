@@ -159,12 +159,12 @@ const ChatArea = ({
   const getPlaceholderText = () => {
     if (isChatDisabled) {
       if (sourceCount === 0) {
-        return "Upload a source to get started...";
+        return "Sube una fuente para comenzar...";
       } else {
-        return "Please wait while your sources are being processed...";
+        return "Por favor espera mientras se procesan tus fuentes...";
       }
     }
-    return "Start typing...";
+    return "Comienza a escribir...";
   };
   return <div className="flex-1 flex flex-col h-full overflow-hidden">
       {hasSource ? <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -174,7 +174,7 @@ const ChatArea = ({
               <h2 className="text-lg font-medium text-gray-900">Chat</h2>
               {shouldShowRefreshButton && <Button variant="ghost" size="sm" onClick={handleRefreshChat} disabled={isDeletingChatHistory || isChatDisabled} className="flex items-center space-x-2">
                   <RefreshCw className={`h-4 w-4 ${isDeletingChatHistory ? 'animate-spin' : ''}`} />
-                  <span>{isDeletingChatHistory ? 'Clearing...' : 'Clear Chat'}</span>
+                  <span>{isDeletingChatHistory ? 'Limpiando...' : 'Limpiar chat'}</span>
                 </Button>}
             </div>
           </div>
@@ -189,17 +189,17 @@ const ChatArea = ({
                   </div>
                   <div>
                     <h1 className="text-2xl font-medium text-gray-900">
-                      {isGenerating ? 'Generating content...' : notebook?.title || 'Untitled Notebook'}
+                      {isGenerating ? 'Generando contenido...' : notebook?.title || 'Cuaderno sin título'}
                     </h1>
-                    <p className="text-sm text-gray-600">{sourceCount} source{sourceCount !== 1 ? 's' : ''}</p>
+                    <p className="text-sm text-gray-600">{sourceCount} fuente{sourceCount !== 1 ? 's' : ''}</p>
                   </div>
                 </div>
                 
                 <div className="bg-gray-50 rounded-lg p-6 mb-6">
                   {isGenerating ? <div className="flex items-center space-x-2 text-gray-600">
                       
-                      <p>AI is analyzing your source and generating a title and description...</p>
-                    </div> : <MarkdownRenderer content={notebook?.description || 'No description available for this notebook.'} className="prose prose-gray max-w-none text-gray-700 leading-relaxed" />}
+                      <p>La IA está analizando tu fuente y generando un título y descripción...</p>
+                    </div> : <MarkdownRenderer content={notebook?.description || 'No hay descripción disponible para este cuaderno.'} className="prose prose-gray max-w-none text-gray-700 leading-relaxed" />}
                 </div>
 
                 {/* Chat Messages */}
@@ -249,7 +249,7 @@ const ChatArea = ({
                 <div className="flex-1 relative">
                   <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className="pr-12" disabled={isChatDisabled || isSending || !!pendingUserMessage} />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                    {sourceCount} source{sourceCount !== 1 ? 's' : ''}
+                    {sourceCount} fuente{sourceCount !== 1 ? 's' : ''}
                   </div>
                 </div>
                 <Button onClick={() => handleSendMessage()} disabled={!message.trim() || isChatDisabled || isSending || !!pendingUserMessage}>
@@ -282,19 +282,19 @@ const ChatArea = ({
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-gray-100">
               <Upload className="h-8 w-8 text-slate-600" />
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-4">Add a source to get started</h2>
+            <h2 className="text-xl font-medium text-gray-900 mb-4">Agrega una fuente para comenzar</h2>
             <Button onClick={() => setShowAddSourcesDialog(true)}>
               <Upload className="h-4 w-4 mr-2" />
-              Upload a source
+              Subir una fuente
             </Button>
           </div>
 
           {/* Bottom Input */}
           <div className="w-full max-w-2xl">
             <div className="flex space-x-4">
-              <Input placeholder="Upload a source to get started" disabled className="flex-1" />
+              <Input placeholder="Sube una fuente para comenzar" disabled className="flex-1" />
               <div className="flex items-center text-sm text-gray-500">
-                0 sources
+                0 fuentes
               </div>
               <Button disabled>
                 <Send className="h-4 w-4" />
@@ -305,7 +305,7 @@ const ChatArea = ({
       
       {/* Footer */}
       <div className="p-4 border-t border-gray-200 flex-shrink-0">
-        <p className="text-center text-sm text-gray-500">InsightsLM can be inaccurate; please double-check its responses.</p>
+        <p className="text-center text-sm text-gray-500">CampusLM puede ser impreciso; por favor verifica sus respuestas.</p>
       </div>
       
       {/* Add Sources Dialog */}

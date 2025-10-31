@@ -73,7 +73,7 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
       className="flex items-center space-x-1 text-gray-600 hover:text-gray-800"
     >
       <FileText className="h-3 w-3" />
-      <span className="text-xs">{isCreating ? 'Saving...' : 'Save to note'}</span>
+      <span className="text-xs">{isCreating ? 'Guardando...' : 'Guardar en nota'}</span>
     </Button>
   );
 };

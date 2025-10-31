@@ -38,7 +38,7 @@ const Notebook = () => {
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
       <NotebookHeader 
-        title={notebook?.title || 'Untitled Notebook'} 
+        title={notebook?.title || 'Cuaderno sin título'} 
         notebookId={notebookId} 
       />
       

@@ -88,24 +88,24 @@ const CopiedTextDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Copy className="h-5 w-5 text-purple-600" />
-            <span>Add Copied Text</span>
+            <span>Agregar texto copiado</span>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              This dialog automatically reads from your clipboard. You can also manually paste content below.
+              Este diálogo lee automáticamente desde tu portapapeles. También puedes pegar contenido manualmente abajo.
             </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm font-medium">
-              Title
+              Título
             </Label>
             <Input
               id="title"
-              placeholder="Enter a title for this content..."
+              placeholder="Ingresa un título para este contenido..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -114,7 +114,7 @@ const CopiedTextDialog = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="content" className="text-sm font-medium">
-                Content
+                Contenido
               </Label>
               <Button
                 variant="outline"
@@ -123,33 +123,33 @@ const CopiedTextDialog = ({
                 className="flex items-center space-x-1"
               >
                 <ClipboardPaste className="h-4 w-4" />
-                <span>Paste from Clipboard</span>
+                <span>Pegar desde el portapapeles</span>
               </Button>
             </div>
             <Textarea
               id="content"
-              placeholder="Your copied content will appear here..."
+              placeholder="Tu contenido copiado aparecerá aquí..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[200px] resize-y"
             />
             <div className="flex justify-between text-xs text-gray-500">
-              <span>{characterCount} characters</span>
+              <span>{characterCount} caracteres</span>
               {characterCount > 10000 && (
-                <span className="text-amber-600">Large content may take longer to process</span>
+                <span className="text-amber-600">El contenido grande puede tardar más en procesarse</span>
               )}
             </div>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={handleClose}>
-              Cancel
+              Cancelar
             </Button>
             <Button 
               onClick={handleSubmit} 
               disabled={!isValid || isSubmitting}
             >
-              {isSubmitting ? 'Adding...' : 'Add Copied Text'}
+              {isSubmitting ? 'Agregando...' : 'Agregar texto copiado'}
             </Button>
           </div>
         </div>
