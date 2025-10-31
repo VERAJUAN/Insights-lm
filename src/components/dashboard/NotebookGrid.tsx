@@ -30,7 +30,7 @@ const NotebookGrid = () => {
     
     if (sortBy === 'Más reciente') {
       return sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    } else if (sortBy === 'Title') {
+    } else if (sortBy === 'Título') {
       return sorted.sort((a, b) => a.title.localeCompare(b.title));
     }
     
