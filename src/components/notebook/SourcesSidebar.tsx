@@ -261,8 +261,28 @@ const SourcesSidebar = ({
                             <span className="text-sm text-gray-900 truncate block">{source.title}</span>
                           </div>
                         </div>
-                        <div className="flex-shrink-0 py-[4px]">
+                        <div className="flex items-center gap-1 flex-shrink-0 py-[4px]">
                           {renderProcessingStatus(source.processing_status)}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-700 hover:text-gray-900"
+                            onClick={(e) => { e.stopPropagation(); handleRenameSource(source); }}
+                            title="Renombrar fuente"
+                            aria-label="Renombrar fuente"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700"
+                            onClick={(e) => { e.stopPropagation(); handleRemoveSource(source); }}
+                            title="Eliminar fuente"
+                            aria-label="Eliminar fuente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </Card>
