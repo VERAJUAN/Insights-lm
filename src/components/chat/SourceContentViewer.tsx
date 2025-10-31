@@ -115,7 +115,7 @@ const SourceContentViewer = ({
   if (!citation || !sourceContent) {
     return (
       <div className="p-4 text-center text-gray-500">
-        <p className="text-sm">Select a citation to view source content</p>
+        <p className="text-sm">Seleccione una cita para ver el contenido fuente.</p>
       </div>
     );
   }
@@ -220,13 +220,13 @@ const SourceContentViewer = ({
                   <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#234776">
                     <path d="M166.67-120.67 120-167.33l317.67-318L254-531l194-121-16.33-228 175 147L818-818.33l-85.67 211.66L880-432l-228.67-16.67-120.66 194L485-438.33 166.67-120.67Zm24.66-536L120-728l72-72 71.33 71.33-72 72Zm366.34 233 58-94.33 111 8.33-72-85 41.66-102.66-102.66 41.66-85-71.66L517-616.67l-94.33 59 108 26.67 27 107.33Zm171 303.67-71.34-72 71.34-71.33 71.33 72L728.67-120ZM575-576Z"/>
                   </svg>
-                  <span>Source guide</span>
+                  <span>Guía de la fuente</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <div className="text-sm text-gray-700 space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2">Summary</h4>
+                    <h4 className="font-medium mb-2">Resumen</h4>
                     <p className="leading-relaxed">{sourceSummary}</p>
                   </div>
                   
