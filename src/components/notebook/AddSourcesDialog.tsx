@@ -52,6 +52,25 @@ const AddSourcesDialog = ({
     toast
   } = useToast();
 
+  // Allowed file extensions
+  const ALLOWED_EXTENSIONS = [
+    // PDF
+    'pdf',
+    // Text files
+    'txt',
+    // Markdown
+    'md', 'markdown',
+    // Audio files
+    'mp3', 'wav', 'm4a', 'mp4', 'ogg', 'flac', 'aac', 'wma'
+  ];
+
+  // Validate file extension
+  const isValidFileExtension = (fileName: string): boolean => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    if (!extension) return false;
+    return ALLOWED_EXTENSIONS.includes(extension);
+  };
+
   // Reset local processing state when dialog opens
   useEffect(() => {
     if (open) {
@@ -164,12 +183,38 @@ const AddSourcesDialog = ({
       return;
     }
 
-    console.log('Processing multiple files with delay strategy:', files.length);
+    // Validate file extensions
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    files.forEach(file => {
+      if (isValidFileExtension(file.name)) {
+        validFiles.push(file);
+      } else {
+        invalidFiles.push(file.name);
+      }
+    });
+
+    // Show error if there are invalid files
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Archivos no permitidos",
+        description: `Los siguientes archivos no tienen una extensión permitida: ${invalidFiles.join(', ')}. Tipos permitidos: PDF, txt, Markdown, Audio (mp3, wav, m4a, etc.)`,
+        variant: "destructive"
+      });
+    }
+
+    // If no valid files, return early
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    console.log('Processing multiple files with delay strategy:', validFiles.length);
     setIsLocallyProcessing(true);
 
     try {
       // Step 1: Create the first source immediately (this will trigger generation if it's the first source)
-      const firstFile = files[0];
+      const firstFile = validFiles[0];
       const firstFileType = firstFile.type.includes('pdf') ? 'pdf' : firstFile.type.includes('audio') ? 'audio' : 'text';
       const firstSourceData = {
         notebookId,
@@ -189,12 +234,12 @@ const AddSourcesDialog = ({
       let remainingSources = [];
       
       // Step 2: If there are more files, add a delay before creating the rest
-      if (files.length > 1) {
+      if (validFiles.length > 1) {
         console.log('Adding 150ms delay before creating remaining sources...');
         await new Promise(resolve => setTimeout(resolve, 150));
         
         // Create remaining sources
-        remainingSources = await Promise.all(files.slice(1).map(async (file, index) => {
+        remainingSources = await Promise.all(validFiles.slice(1).map(async (file, index) => {
           const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
           const sourceData = {
             notebookId,
@@ -226,11 +271,11 @@ const AddSourcesDialog = ({
       // Step 4: Show success toast
       toast({
         title: "Archivos agregados",
-        description: `${files.length} archivo${files.length > 1 ? 's' : ''} agregado${files.length > 1 ? 's' : ''} y procesamiento iniciado`
+        description: `${validFiles.length} archivo${validFiles.length > 1 ? 's' : ''} agregado${validFiles.length > 1 ? 's' : ''} y procesamiento iniciado`
       });
 
       // Step 5: Process files in parallel (background)
-      const processingPromises = files.map((file, index) => processFileAsync(file, allCreatedSources[index].id, notebookId));
+      const processingPromises = validFiles.map((file, index) => processFileAsync(file, allCreatedSources[index].id, notebookId));
 
       // Don't await - let processing happen in background
       Promise.allSettled(processingPromises).then(results => {
@@ -467,7 +512,7 @@ const AddSourcesDialog = ({
                   type="file"
                   multiple
                   className="hidden"
-                  accept=".pdf,.txt,.md,.mp3,.wav,.m4a"
+                  accept=".pdf,.txt,.md,.markdown,.mp3,.wav,.m4a,.mp4,.ogg,.flac,.aac,.wma"
                   onChange={handleFileSelect}
                   disabled={isProcessingFiles}
                 />
