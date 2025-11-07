@@ -9,7 +9,7 @@ const Auth = () => {
             <Logo size="lg" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">CampusLM</h1>
-          <p className="text-gray-600">Tu asistente virtual 24/7 potenciado por IA desarrollado por Campus Norte UNCy  basado en el conocimiento de las instituciones</p>
+          <p className="text-gray-600">Tu asistente virtual 24/7 potenciado por IA desarrollado por Campus Norte UNC y basado en el conocimiento de las instituciones</p>
         </div>
         <AuthForm />
       </div>
