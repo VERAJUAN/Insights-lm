@@ -144,44 +144,26 @@ const UserManagement = () => {
       role: 'administrator' | 'reader';
       organizationId: string;
     }) => {
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email,
+          password,
+          fullName,
+          role,
+          organizationId,
         },
       });
 
-      if (authError) {
-        console.error('Error creating user in auth:', authError);
-        throw authError;
+      if (error) {
+        console.error('Error invoking admin-create-user function:', error);
+        throw new Error(error.message || 'Error al crear el usuario');
       }
 
-      if (!authData.user) {
-        throw new Error('No se pudo crear el usuario');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Error al crear el usuario');
       }
 
-      // Update profile with role and organization
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          role,
-          organization_id: organizationId,
-          full_name: fullName,
-        })
-        .eq('id', authData.user.id)
-        .select()
-        .single();
-
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-        throw profileError;
-      }
-
-      return profileData;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allUsers'] });
