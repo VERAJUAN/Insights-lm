@@ -217,6 +217,30 @@ BEGIN
 END;
 $$;
 
+-- Function to prevent users from changing their own role or organization_id
+CREATE OR REPLACE FUNCTION public.prevent_user_role_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Only apply this check if the user is updating their own profile
+    IF auth.uid() = new.id THEN
+        -- Prevent users from changing their own role
+        IF OLD.role IS DISTINCT FROM NEW.role THEN
+            RAISE EXCEPTION 'No puedes cambiar tu propio rol. Contacta a un administrador.';
+        END IF;
+        
+        -- Prevent users from changing their own organization_id
+        IF OLD.organization_id IS DISTINCT FROM NEW.organization_id THEN
+            RAISE EXCEPTION 'No puedes cambiar tu propia organización. Contacta a un administrador.';
+        END IF;
+    END IF;
+    
+    RETURN new;
+END;
+$$;
+
 -- ============================================================================
 -- TRIGGERS
 -- ============================================================================
@@ -226,6 +250,12 @@ DROP TRIGGER IF EXISTS update_organizations_updated_at ON public.organizations;
 CREATE TRIGGER update_organizations_updated_at
     BEFORE UPDATE ON public.organizations
     FOR EACH ROW EXECUTE FUNCTION public.update_organizations_updated_at();
+
+-- Trigger to prevent users from changing their own role or organization_id
+DROP TRIGGER IF EXISTS prevent_user_role_change ON public.profiles;
+CREATE TRIGGER prevent_user_role_change
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_user_role_change();
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -383,21 +413,12 @@ CREATE POLICY "Superadministrator can update all profiles"
     USING (public.is_superadministrator())
     WITH CHECK (public.is_superadministrator());
 
--- Users can update their own profile (except role and organization_id)
+-- Users can update their own profile (role and organization_id restrictions handled by trigger)
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = id)
-    WITH CHECK (
-        auth.uid() = id
-        AND (
-            -- Users cannot change their own role
-            (OLD.role IS NOT DISTINCT FROM NEW.role)
-            AND
-            -- Users cannot change their own organization_id
-            (OLD.organization_id IS NOT DISTINCT FROM NEW.organization_id)
-        )
-    );
+    WITH CHECK (auth.uid() = id);
 
 -- ============================================================================
 -- UPDATE EXISTING NOTEBOOKS POLICIES
@@ -537,11 +558,20 @@ CREATE POLICY "Superadministrator can view all sources"
     ON public.sources FOR SELECT
     USING (public.is_superadministrator());
 
--- Users can view sources from accessible notebooks
+-- Superadministrator can view all sources
+DROP POLICY IF EXISTS "Superadministrator can view all sources" ON public.sources;
+CREATE POLICY "Superadministrator can view all sources"
+    ON public.sources FOR SELECT
+    USING (public.is_superadministrator());
+
+-- Users (non-readers) can view sources from accessible notebooks
 DROP POLICY IF EXISTS "Users can view sources from accessible notebooks" ON public.sources;
 CREATE POLICY "Users can view sources from accessible notebooks"
     ON public.sources FOR SELECT
-    USING (public.can_access_notebook(notebook_id));
+    USING (
+        public.can_access_notebook(notebook_id)
+        AND NOT public.is_reader()
+    );
 
 -- Superadministrator can manage all sources
 DROP POLICY IF EXISTS "Superadministrator can manage all sources" ON public.sources;
@@ -550,24 +580,36 @@ CREATE POLICY "Superadministrator can manage all sources"
     USING (public.is_superadministrator())
     WITH CHECK (public.is_superadministrator());
 
--- Users can create sources in accessible notebooks
+-- Users (non-readers) can create sources in accessible notebooks
 DROP POLICY IF EXISTS "Users can create sources in accessible notebooks" ON public.sources;
 CREATE POLICY "Users can create sources in accessible notebooks"
     ON public.sources FOR INSERT
-    WITH CHECK (public.can_access_notebook(notebook_id));
+    WITH CHECK (
+        public.can_access_notebook(notebook_id)
+        AND NOT public.is_reader()
+    );
 
--- Users can update sources in accessible notebooks
+-- Users (non-readers) can update sources in accessible notebooks
 DROP POLICY IF EXISTS "Users can update sources in accessible notebooks" ON public.sources;
 CREATE POLICY "Users can update sources in accessible notebooks"
     ON public.sources FOR UPDATE
-    USING (public.can_access_notebook(notebook_id))
-    WITH CHECK (public.can_access_notebook(notebook_id));
+    USING (
+        public.can_access_notebook(notebook_id)
+        AND NOT public.is_reader()
+    )
+    WITH CHECK (
+        public.can_access_notebook(notebook_id)
+        AND NOT public.is_reader()
+    );
 
--- Users can delete sources from accessible notebooks
+-- Users (non-readers) can delete sources from accessible notebooks
 DROP POLICY IF EXISTS "Users can delete sources from accessible notebooks" ON public.sources;
 CREATE POLICY "Users can delete sources from accessible notebooks"
     ON public.sources FOR DELETE
-    USING (public.can_access_notebook(notebook_id));
+    USING (
+        public.can_access_notebook(notebook_id)
+        AND NOT public.is_reader()
+    );
 
 -- ============================================================================
 -- UPDATE NOTES POLICIES (to respect notebook access)

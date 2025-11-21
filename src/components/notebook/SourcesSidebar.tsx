@@ -11,6 +11,7 @@ import RenameSourceDialog from './RenameSourceDialog';
 import SourceContentViewer from '@/components/chat/SourceContentViewer';
 import { useSources } from '@/hooks/useSources';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Citation } from '@/types/message';
 
 interface SourcesSidebarProps {
@@ -34,6 +35,7 @@ const SourcesSidebar = ({
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [selectedSourceForViewing, setSelectedSourceForViewing] = useState<any>(null);
 
+  const { isReader } = useUserRole();
   const {
     sources,
     isLoading
@@ -221,6 +223,24 @@ const SourcesSidebar = ({
           className="flex-1 overflow-hidden" 
           isOpenedFromSourceList={selectedCitation.citation_id === -1}
         />
+      </div>
+    );
+  }
+
+  // For readers, hide the sources sidebar completely
+  if (isReader) {
+    return (
+      <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <p className="text-sm text-gray-500">
+              Como lector, solo puedes chatear con este cuaderno. No puedes ver ni gestionar las fuentes.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

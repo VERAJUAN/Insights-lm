@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useSources } from '@/hooks/useSources';
+import { useUserRole } from '@/hooks/useUserRole';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
@@ -48,6 +49,7 @@ const ChatArea = ({
     isDeletingChatHistory
   } = useChatMessages(notebookId);
   
+  const { isReader } = useUserRole();
   const {
     sources
   } = useSources(notebookId);
@@ -55,9 +57,12 @@ const ChatArea = ({
   const sourceCount = sources?.length || 0;
 
   // Check if at least one source has been successfully processed
-  const hasProcessedSource = sources?.some(source => source.processing_status === 'completed') || false;
+  // For readers, assume sources are processed if they have access to the notebook
+  const hasProcessedSource = isReader 
+    ? true // Readers can chat if they have access to the notebook (assumes sources are processed)
+    : sources?.some(source => source.processing_status === 'completed') || false;
 
-  // Chat should be disabled if there are no processed sources
+  // Chat should be disabled if there are no processed sources (except for readers)
   const isChatDisabled = !hasProcessedSource;
 
   // Track when we send a message to show loading state
@@ -157,6 +162,9 @@ const ChatArea = ({
 
   // Update placeholder text based on processing status
   const getPlaceholderText = () => {
+    if (isReader) {
+      return "Escribe tu pregunta...";
+    }
     if (isChatDisabled) {
       if (sourceCount === 0) {
         return "Sube una fuente para comenzar...";
@@ -282,11 +290,15 @@ const ChatArea = ({
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-gray-100">
               <Upload className="h-8 w-8 text-slate-600" />
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-4">Agrega una fuente para comenzar</h2>
-            <Button onClick={() => setShowAddSourcesDialog(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Subir una fuente
-            </Button>
+            <h2 className="text-xl font-medium text-gray-900 mb-4">
+              {isReader ? 'Chat con el cuaderno' : 'Agrega una fuente para comenzar'}
+            </h2>
+            {!isReader && (
+              <Button onClick={() => setShowAddSourcesDialog(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Subir una fuente
+              </Button>
+            )}
           </div>
 
           {/* Bottom Input */}

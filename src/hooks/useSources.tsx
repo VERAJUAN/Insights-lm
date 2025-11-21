@@ -2,11 +2,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from './useUserRole';
 import { useNotebookGeneration } from './useNotebookGeneration';
 import { useEffect } from 'react';
 
 export const useSources = (notebookId?: string) => {
   const { user } = useAuth();
+  const { isReader } = useUserRole();
   const queryClient = useQueryClient();
   const { generateNotebookContentAsync } = useNotebookGeneration();
 
@@ -19,6 +21,9 @@ export const useSources = (notebookId?: string) => {
     queryFn: async () => {
       if (!notebookId) return [];
       
+      // Readers cannot access sources
+      if (isReader) return [];
+      
       const { data, error } = await supabase
         .from('sources')
         .select('*')
@@ -28,12 +33,12 @@ export const useSources = (notebookId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!notebookId,
+    enabled: !!notebookId && !isReader,
   });
 
   // Set up Realtime subscription for sources table
   useEffect(() => {
-    if (!notebookId || !user) return;
+    if (!notebookId || !user || isReader) return;
 
     console.log('Setting up Realtime subscription for sources table, notebook:', notebookId);
 
