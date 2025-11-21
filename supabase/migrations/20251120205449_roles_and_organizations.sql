@@ -209,6 +209,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE SECURITY DEFINER
 SET search_path = ''
+SET row_security = off
 AS $$
 DECLARE
     current_user_id uuid;
@@ -266,6 +267,31 @@ BEGIN
     END IF;
 
     RETURN false;
+END;
+$$;
+
+-- Helper to check if current user (reader) is assigned to a notebook
+CREATE OR REPLACE FUNCTION public.is_assigned_reader_for_notebook(notebook_id_param uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = ''
+SET row_security = off
+AS $$
+DECLARE
+    current_user_id uuid;
+BEGIN
+    current_user_id := auth.uid();
+    IF current_user_id IS NULL THEN
+        RETURN false;
+    END IF;
+
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.notebook_assignments
+        WHERE notebook_id = notebook_id_param
+        AND user_id = current_user_id
+    );
 END;
 $$;
 
@@ -366,46 +392,68 @@ ALTER TABLE public.user_roles_lookup ENABLE ROW LEVEL SECURITY;
 -- USER ROLES LOOKUP POLICIES
 -- ============================================================================
 
--- Simple policy: Users can only read their own role from the lookup table
--- This breaks the recursion because checking your own role doesn't require
--- checking your role first - it's a direct comparison
-DROP POLICY IF EXISTS "Users can read own role lookup" ON public.user_roles_lookup;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'user_roles_lookup' 
+          AND policyname = 'Users can read own role lookup'
+    ) THEN
+        DROP POLICY "Users can read own role lookup" ON public.user_roles_lookup;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'user_roles_lookup' 
+          AND policyname = 'Service role can manage role lookup'
+    ) THEN
+        DROP POLICY "Service role can manage role lookup" ON public.user_roles_lookup;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'user_roles_lookup' 
+          AND policyname = 'Allow role lookup inserts'
+    ) THEN
+        DROP POLICY "Allow role lookup inserts" ON public.user_roles_lookup;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'user_roles_lookup' 
+          AND policyname = 'Allow role lookup updates'
+    ) THEN
+        DROP POLICY "Allow role lookup updates" ON public.user_roles_lookup;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'user_roles_lookup' 
+          AND policyname = 'Allow role lookup deletes'
+    ) THEN
+        DROP POLICY "Allow role lookup deletes" ON public.user_roles_lookup;
+    END IF;
+END $$;
+
 CREATE POLICY "Users can read own role lookup"
     ON public.user_roles_lookup FOR SELECT
     USING (user_id = auth.uid());
 
--- Allow the sync trigger (SECURITY DEFINER) to manage the lookup table
--- The trigger function has SECURITY DEFINER, which should bypass RLS,
--- but we add policies to ensure inserts/updates/deletes work correctly
--- Note: SECURITY DEFINER functions should bypass RLS, but we add these as safety
-
--- Policy for service_role (used by Supabase admin operations)
-DROP POLICY IF EXISTS "Service role can manage role lookup" ON public.user_roles_lookup;
 CREATE POLICY "Service role can manage role lookup"
     ON public.user_roles_lookup FOR ALL
     USING (auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'service_role');
 
--- Policy to allow the sync function to insert/update/delete
--- CRITICAL: These policies allow the trigger to manage the lookup table
--- The SELECT policy above restricts reads to own user_id for security
-DROP POLICY IF EXISTS "Sync function can manage role lookup" ON public.user_roles_lookup;
-DROP POLICY IF EXISTS "Allow role lookup management" ON public.user_roles_lookup;
-DROP POLICY IF EXISTS "Allow role lookup updates" ON public.user_roles_lookup;
-DROP POLICY IF EXISTS "Allow role lookup deletes" ON public.user_roles_lookup;
-
--- Allow inserts (needed for trigger when creating new users)
 CREATE POLICY "Allow role lookup inserts"
     ON public.user_roles_lookup FOR INSERT
     WITH CHECK (true);
-    
--- Allow updates (needed for trigger when updating user roles)
+
 CREATE POLICY "Allow role lookup updates"
     ON public.user_roles_lookup FOR UPDATE
     USING (true)
     WITH CHECK (true);
-    
--- Allow deletes (needed for trigger when deleting users)
+
 CREATE POLICY "Allow role lookup deletes"
     ON public.user_roles_lookup FOR DELETE
     USING (true);
@@ -652,18 +700,8 @@ DROP POLICY IF EXISTS "Readers can view assigned notebooks" ON public.notebooks;
 CREATE POLICY "Readers can view assigned notebooks"
     ON public.notebooks FOR SELECT
     USING (
-        EXISTS (
-            SELECT 1 
-            FROM public.profiles 
-            WHERE id = auth.uid() 
-            AND role = 'reader'
-        )
-        AND EXISTS (
-            SELECT 1 
-            FROM public.notebook_assignments 
-            WHERE notebook_id = notebooks.id 
-            AND user_id = auth.uid()
-        )
+        public.is_reader()
+        AND public.is_assigned_reader_for_notebook(notebooks.id)
     );
 
 -- Superadministrator can create notebooks

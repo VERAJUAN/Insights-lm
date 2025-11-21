@@ -18,17 +18,27 @@ const NotebookAssignment = () => {
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  // Fetch readers in the organization
+  // Fetch readers in the organization (or all readers for superadministrator)
   const { data: readers = [], isLoading: isLoadingReaders } = useQuery({
-    queryKey: ['organizationReaders', organizationId],
+    queryKey: ['organizationReaders', organizationId, isSuperadministrator],
     queryFn: async () => {
-      if (!organizationId) return [];
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
-        .select('id, email, full_name')
-        .eq('organization_id', organizationId)
-        .eq('role', 'reader');
+        .select('id, email, full_name, organization_id');
+
+      if (isSuperadministrator) {
+        // Superadministrator can see all readers
+        query = query.eq('role', 'reader');
+      } else if (organizationId) {
+        // Administrator can only see readers in their organization
+        query = query
+          .eq('organization_id', organizationId)
+          .eq('role', 'reader');
+      } else {
+        return [];
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching readers:', error);
@@ -37,7 +47,7 @@ const NotebookAssignment = () => {
 
       return data || [];
     },
-    enabled: !!organizationId && (isAdministrator || isSuperadministrator),
+    enabled: (isAdministrator || isSuperadministrator) && (!!organizationId || isSuperadministrator),
   });
 
   // Fetch current assignments for selected notebook
@@ -153,12 +163,35 @@ const NotebookAssignment = () => {
     !assignments.some(a => a.user_id === reader.id)
   );
 
+  // Show message if administrator has no organization
+  if (isAdministrator && !organizationId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Asignar Cuadernos a Lectores</CardTitle>
+          <CardDescription>
+            Asigna cuadernos específicos a los lectores de tu organización para que puedan acceder a ellos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-gray-500">
+              No tienes una organización asignada. Contacta a un superadministrador para que te asigne una organización.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Asignar Cuadernos a Lectores</CardTitle>
         <CardDescription>
-          Asigna cuadernos específicos a los lectores de tu organización para que puedan acceder a ellos.
+          {isSuperadministrator 
+            ? 'Asigna cuadernos específicos a los lectores para que puedan acceder a ellos.'
+            : 'Asigna cuadernos específicos a los lectores de tu organización para que puedan acceder a ellos.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -169,13 +202,26 @@ const NotebookAssignment = () => {
               <SelectValue placeholder="Selecciona un cuaderno" />
             </SelectTrigger>
             <SelectContent>
-              {organizationNotebooks.map((notebook) => (
-                <SelectItem key={notebook.id} value={notebook.id}>
-                  {notebook.title}
+              {organizationNotebooks.length === 0 ? (
+                <SelectItem value="no-notebooks" disabled>
+                  No hay cuadernos disponibles
                 </SelectItem>
-              ))}
+              ) : (
+                organizationNotebooks.map((notebook) => (
+                  <SelectItem key={notebook.id} value={notebook.id}>
+                    {notebook.title}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
+          {organizationNotebooks.length === 0 && (
+            <p className="text-sm text-gray-500">
+              {isSuperadministrator 
+                ? 'No hay cuadernos en el sistema. Los administradores pueden crear cuadernos desde la pestaña "Cuadernos".'
+                : 'No hay cuadernos en tu organización. Crea cuadernos desde la pestaña "Cuadernos".'}
+            </p>
+          )}
         </div>
 
         {selectedNotebookId && (

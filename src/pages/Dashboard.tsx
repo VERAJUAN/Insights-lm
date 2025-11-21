@@ -6,18 +6,21 @@ import EmptyDashboard from '@/components/dashboard/EmptyDashboard';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSystemStatus } from '@/hooks/useSystemStatus';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrganizationPromptEditor from '@/components/admin/OrganizationPromptEditor';
 import NotebookAssignment from '@/components/admin/NotebookAssignment';
 import UserManagement from '@/components/admin/UserManagement';
 import OrganizationsOverview from '@/components/admin/OrganizationsOverview';
 import OrganizationManagement from '@/components/admin/OrganizationManagement';
+import SuperAdminEmptyState from '@/components/admin/SuperAdminEmptyState';
 import { Settings, Users, FileText, BookOpen, Building2 } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, loading: authLoading, error: authError } = useAuth();
   const { notebooks, isLoading, error, isError } = useNotebooks();
   const { isSuperadministrator, isAdministrator, isReader, isLoading: isLoadingRole } = useUserRole();
+  const { status: systemStatus, isLoading: isLoadingSystemStatus } = useSystemStatus();
   const [activeTab, setActiveTab] = useState('notebooks');
   const hasNotebooks = notebooks && notebooks.length > 0;
 
@@ -104,6 +107,12 @@ const Dashboard = () => {
   }
 
   const showAdminTabs = (isSuperadministrator || isAdministrator) && !isLoadingRole;
+  
+  // Check if system is empty and user is superadministrator
+  const showSuperAdminEmptyState = 
+    isSuperadministrator && 
+    !isLoadingSystemStatus && 
+    systemStatus.isEmpty;
 
   return (
     <div className="min-h-screen bg-white">
@@ -152,7 +161,16 @@ const Dashboard = () => {
             </TabsList>
 
             <TabsContent value="notebooks" className="mt-6">
-              {hasNotebooks ? <NotebookGrid /> : <EmptyDashboard />}
+              {showSuperAdminEmptyState ? (
+                <SuperAdminEmptyState
+                  onNavigateToOrganizations={() => setActiveTab('org-management')}
+                  onNavigateToUsers={() => setActiveTab('users')}
+                />
+              ) : hasNotebooks ? (
+                <NotebookGrid />
+              ) : (
+                <EmptyDashboard />
+              )}
             </TabsContent>
 
             {isAdministrator && (
