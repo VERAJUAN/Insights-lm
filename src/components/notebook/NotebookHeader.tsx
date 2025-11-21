@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useLogout } from '@/services/authService';
 import Logo from '@/components/ui/Logo';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface NotebookHeaderProps {
   title: string;
@@ -21,6 +22,8 @@ interface NotebookHeaderProps {
 const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
   const navigate = useNavigate();
   const { logout } = useLogout();
+  const { profile } = useUserRole();
+  const fullName = profile?.full_name || '';
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
   const { updateNotebook, isUpdating } = useNotebookUpdate();
@@ -93,6 +96,11 @@ const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
         
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
+            {fullName && (
+              <span className="text-sm text-gray-700">
+                Hola {fullName}
+              </span>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="p-0">

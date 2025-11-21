@@ -33,8 +33,17 @@ export const useNotebooks = () => {
 
       // Filter notebooks based on role
       if (isSuperadministrator) {
-        // Superadministrator can see all notebooks
-        // No filter needed - RLS will handle it
+        // Superadministrator can see all notebooks with organization info
+        // Include organization data via join
+        query = supabase
+          .from('notebooks')
+          .select(`
+            *,
+            organizations (
+              id,
+              name
+            )
+          `);
       } else if (isAdministrator) {
         // Administrator can see notebooks from their organization
         query = query.eq('organization_id', organizationId);
@@ -66,7 +75,7 @@ export const useNotebooks = () => {
 
       // Then get source counts separately for each notebook
       const notebooksWithCounts = await Promise.all(
-        (notebooksData || []).map(async (notebook) => {
+        (notebooksData || []).map(async (notebook: any) => {
           const { count, error: countError } = await supabase
             .from('sources')
             .select('*', { count: 'exact', head: true })
@@ -77,7 +86,16 @@ export const useNotebooks = () => {
             return { ...notebook, sources: [{ count: 0 }] };
           }
 
-          return { ...notebook, sources: [{ count: count || 0 }] };
+          // Extract organization name if it exists (for superadministrator)
+          const organizationName = notebook.organizations?.name || null;
+          const notebookData = { ...notebook };
+          delete notebookData.organizations; // Remove the nested object
+          
+          return { 
+            ...notebookData, 
+            sources: [{ count: count || 0 }],
+            organization_name: organizationName
+          };
         })
       );
 

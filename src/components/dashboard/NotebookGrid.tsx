@@ -5,6 +5,7 @@ import NotebookCard from './NotebookCard';
 import { Check, Grid3X3, List, ChevronDown } from 'lucide-react';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ const NotebookGrid = () => {
     notebookCount,
     maxNotebooks
   } = useNotebooks();
+  const { isSuperadministrator } = useUserRole();
   const navigate = useNavigate();
 
   const sortedNotebooks = useMemo(() => {
@@ -124,7 +126,8 @@ const NotebookGrid = () => {
           }),
           sources: notebook.sources?.[0]?.count || 0,
           icon: notebook.icon || '📝',
-          color: notebook.color || 'bg-gray-100'
+          color: notebook.color || 'bg-gray-100',
+          organizationName: isSuperadministrator ? (notebook as any).organization_name : undefined
         }} />
           </div>)}
       </div>

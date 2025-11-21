@@ -12,6 +12,7 @@ interface NotebookCardProps {
     icon: string;
     color: string;
     hasCollaborators?: boolean;
+    organizationName?: string | null;
   };
 }
 
@@ -78,6 +79,14 @@ const NotebookCard = ({
       <h3 className="text-gray-900 mb-2 pr-6 line-clamp-2 text-2xl font-normal flex-grow">
         {notebook.title}
       </h3>
+      
+      {notebook.organizationName && (
+        <div className="mb-2">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+            {notebook.organizationName}
+          </span>
+        </div>
+      )}
       
       <div className="flex items-center justify-between text-sm text-gray-500 mt-auto">
         <span>{notebook.date} • {notebook.sources} fuente{notebook.sources !== 1 ? 's' : ''}</span>
