@@ -1,14 +1,20 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Globe, Video, Mic } from 'lucide-react';
+import { Upload, FileText, Globe, Video, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotebooks } from '@/hooks/useNotebooks';
+import { useUserRole } from '@/hooks/useUserRole';
+import { canCreateNotebook } from '@/utils/permissions';
+
 const EmptyDashboard = () => {
   const navigate = useNavigate();
+  const { isReader, role } = useUserRole();
   const {
     createNotebook,
-    isCreating
+    isCreating,
+    notebooks
   } = useNotebooks();
+
   const handleCreateNotebook = () => {
     console.log('Create notebook button clicked');
     console.log('isCreating:', isCreating);
@@ -25,10 +31,35 @@ const EmptyDashboard = () => {
       }
     });
   };
-  return <div className="text-center py-16">
+
+  // Si el usuario es reader, mostrar mensaje diferente
+  if (isReader) {
+    return (
+      <div className="text-center py-16">
+        <div className="mb-8">
+          <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+            <BookOpen className="h-8 w-8 text-gray-400" />
+          </div>
+          <h2 className="text-3xl font-medium text-gray-900 mb-4">No tienes cuadernos asignados</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Como lector, solo puedes acceder a los cuadernos que un administrador te haya asignado. 
+            Si crees que deberías tener acceso a algún cuaderno, contacta a tu administrador.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Para usuarios que pueden crear cuadernos
+  const canCreate = canCreateNotebook(role, notebooks?.length || 0);
+
+  return (
+    <div className="text-center py-16">
       <div className="mb-12">
         <h2 className="text-3xl font-medium text-gray-900 mb-4">Crea tu primer cuaderno</h2>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">CampusLM es un asistente de investigación y escritura impulsado por IA que funciona mejor con las fuentes que subes</p>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          CampusLM es un asistente de investigación y escritura impulsado por IA que funciona mejor con las fuentes que subes
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
@@ -57,10 +88,14 @@ const EmptyDashboard = () => {
         </div>
       </div>
 
-      <Button onClick={handleCreateNotebook} size="lg" className="bg-blue-600 hover:bg-blue-700" disabled={isCreating}>
-        <Upload className="h-5 w-5 mr-2" />
-        {isCreating ? 'Creando...' : 'Crear cuaderno'}
-      </Button>
-    </div>;
+      {canCreate && (
+        <Button onClick={handleCreateNotebook} size="lg" className="bg-blue-600 hover:bg-blue-700" disabled={isCreating}>
+          <Upload className="h-5 w-5 mr-2" />
+          {isCreating ? 'Creando...' : 'Crear cuaderno'}
+        </Button>
+      )}
+    </div>
+  );
 };
+
 export default EmptyDashboard;

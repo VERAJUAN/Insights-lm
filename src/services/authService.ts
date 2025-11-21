@@ -13,7 +13,7 @@ export const useLogout = () => {
       await signOut();
       
       toast({
-        title: "Sesióg cerrada",
+        title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente."
       });
       

@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS public.notebook_assignments (
     UNIQUE(notebook_id, user_id)
 );
 
+-- Create user_roles_lookup table to break RLS recursion
+-- This table stores only user_id and role, with simple RLS policies
+-- Functions will query this table instead of profiles to avoid recursion
+CREATE TABLE IF NOT EXISTS public.user_roles_lookup (
+    user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    role user_role DEFAULT 'reader'
+);
+
+-- Drop updated_at column if it exists (from previous migration attempts)
+ALTER TABLE public.user_roles_lookup DROP COLUMN IF EXISTS updated_at;
+
 -- ============================================================================
 -- MODIFY EXISTING TABLES
 -- ============================================================================
@@ -74,54 +85,106 @@ CREATE INDEX IF NOT EXISTS idx_profiles_organization_id ON public.profiles(organ
 -- Indexes for notebooks (organization)
 CREATE INDEX IF NOT EXISTS idx_notebooks_organization_id ON public.notebooks(organization_id);
 
+-- Indexes for user_roles_lookup
+CREATE INDEX IF NOT EXISTS idx_user_roles_lookup_user_id ON public.user_roles_lookup(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_lookup_role ON public.user_roles_lookup(role);
+
+-- ============================================================================
+-- ROLE LOOKUP TABLE SYNC FUNCTION
+-- ============================================================================
+
+-- Function to sync user_roles_lookup table from profiles
+-- This keeps the lookup table in sync automatically
+-- Uses SECURITY DEFINER to bypass RLS when inserting/updating/deleting
+CREATE OR REPLACE FUNCTION public.sync_user_role_lookup()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+        -- Insert or update in user_roles_lookup
+        -- SECURITY DEFINER should bypass RLS, but we handle errors gracefully
+        BEGIN
+            INSERT INTO public.user_roles_lookup (user_id, role)
+            VALUES (NEW.id, COALESCE(NEW.role, 'reader'::user_role))
+            ON CONFLICT (user_id) 
+            DO UPDATE SET role = EXCLUDED.role;
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- Log error but don't fail the transaction
+                -- This ensures user creation doesn't fail if lookup table has issues
+                RAISE WARNING 'Error syncing user_roles_lookup for user %: %', NEW.id, SQLERRM;
+        END;
+    ELSIF (TG_OP = 'DELETE') THEN
+        BEGIN
+            DELETE FROM public.user_roles_lookup WHERE user_id = OLD.id;
+        EXCEPTION
+            WHEN OTHERS THEN
+                RAISE WARNING 'Error deleting from user_roles_lookup for user %: %', OLD.id, SQLERRM;
+        END;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+-- Create trigger to maintain user_roles_lookup table
+DROP TRIGGER IF EXISTS trigger_sync_user_role_lookup ON public.profiles;
+CREATE TRIGGER trigger_sync_user_role_lookup
+    AFTER INSERT OR UPDATE OF role OR DELETE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.sync_user_role_lookup();
+
+-- Populate the lookup table with existing data
+INSERT INTO public.user_roles_lookup (user_id, role)
+SELECT id, COALESCE(role, 'reader'::user_role) FROM public.profiles
+ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
+
 -- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
 
 -- Function to check if user is superadministrator
--- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
+-- Uses user_roles_lookup table instead of profiles to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_superadministrator()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
-SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
-        FROM public.profiles 
-        WHERE id = auth.uid() 
+        FROM public.user_roles_lookup
+        WHERE user_id = auth.uid() 
         AND role = 'superadministrator'
     );
 $$;
 
 -- Function to check if user is administrator
--- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
+-- Uses user_roles_lookup table instead of profiles to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_administrator()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
-SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
-        FROM public.profiles 
-        WHERE id = auth.uid() 
+        FROM public.user_roles_lookup
+        WHERE user_id = auth.uid() 
         AND role = 'administrator'
     );
 $$;
 
 -- Function to check if user is reader
--- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
+-- Uses user_roles_lookup table instead of profiles to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_reader()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
-SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
-        FROM public.profiles 
-        WHERE id = auth.uid() 
+        FROM public.user_roles_lookup
+        WHERE user_id = auth.uid() 
         AND role = 'reader'
     );
 $$;
@@ -297,6 +360,55 @@ CREATE TRIGGER prevent_user_role_change
 -- Enable RLS on new tables
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notebook_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles_lookup ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- USER ROLES LOOKUP POLICIES
+-- ============================================================================
+
+-- Simple policy: Users can only read their own role from the lookup table
+-- This breaks the recursion because checking your own role doesn't require
+-- checking your role first - it's a direct comparison
+DROP POLICY IF EXISTS "Users can read own role lookup" ON public.user_roles_lookup;
+CREATE POLICY "Users can read own role lookup"
+    ON public.user_roles_lookup FOR SELECT
+    USING (user_id = auth.uid());
+
+-- Allow the sync trigger (SECURITY DEFINER) to manage the lookup table
+-- The trigger function has SECURITY DEFINER, which should bypass RLS,
+-- but we add policies to ensure inserts/updates/deletes work correctly
+-- Note: SECURITY DEFINER functions should bypass RLS, but we add these as safety
+
+-- Policy for service_role (used by Supabase admin operations)
+DROP POLICY IF EXISTS "Service role can manage role lookup" ON public.user_roles_lookup;
+CREATE POLICY "Service role can manage role lookup"
+    ON public.user_roles_lookup FOR ALL
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
+
+-- Policy to allow the sync function to insert/update/delete
+-- CRITICAL: These policies allow the trigger to manage the lookup table
+-- The SELECT policy above restricts reads to own user_id for security
+DROP POLICY IF EXISTS "Sync function can manage role lookup" ON public.user_roles_lookup;
+DROP POLICY IF EXISTS "Allow role lookup management" ON public.user_roles_lookup;
+DROP POLICY IF EXISTS "Allow role lookup updates" ON public.user_roles_lookup;
+DROP POLICY IF EXISTS "Allow role lookup deletes" ON public.user_roles_lookup;
+
+-- Allow inserts (needed for trigger when creating new users)
+CREATE POLICY "Allow role lookup inserts"
+    ON public.user_roles_lookup FOR INSERT
+    WITH CHECK (true);
+    
+-- Allow updates (needed for trigger when updating user roles)
+CREATE POLICY "Allow role lookup updates"
+    ON public.user_roles_lookup FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+    
+-- Allow deletes (needed for trigger when deleting users)
+CREATE POLICY "Allow role lookup deletes"
+    ON public.user_roles_lookup FOR DELETE
+    USING (true);
 
 -- ============================================================================
 -- ORGANIZATIONS POLICIES
@@ -418,6 +530,10 @@ DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 
 -- Superadministrator can view all profiles
+-- FINAL SOLUTION: We use the function is_superadministrator() which has SECURITY DEFINER
+-- and should bypass RLS. However, if this still causes recursion, we need to ensure
+-- the function truly bypasses RLS. The function is configured to run as postgres
+-- (superuser) which should bypass RLS completely.
 DROP POLICY IF EXISTS "Superadministrator can view all profiles" ON public.profiles;
 CREATE POLICY "Superadministrator can view all profiles"
     ON public.profiles FOR SELECT
@@ -440,11 +556,26 @@ CREATE POLICY "Administrators can view organization profiles"
     );
 
 -- Superadministrator can update all profiles
+-- IMPORTANT: We cannot use is_superadministrator() here to avoid recursion
 DROP POLICY IF EXISTS "Superadministrator can update all profiles" ON public.profiles;
 CREATE POLICY "Superadministrator can update all profiles"
     ON public.profiles FOR UPDATE
-    USING (public.is_superadministrator())
-    WITH CHECK (public.is_superadministrator());
+    USING (
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles p
+            WHERE p.id = auth.uid() 
+            AND p.role = 'superadministrator'
+        )
+    )
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles p
+            WHERE p.id = auth.uid() 
+            AND p.role = 'superadministrator'
+        )
+    );
 
 -- Users can update their own profile (role and organization_id restrictions handled by trigger)
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
@@ -472,10 +603,23 @@ DROP POLICY IF EXISTS "Administrators can delete organization notebooks" ON publ
 DROP POLICY IF EXISTS "Readers can view assigned notebooks" ON public.notebooks;
 
 -- Superadministrator can view all notebooks
+-- IMPORTANT: We cannot use is_superadministrator() here because it causes recursion
+-- when the function queries profiles and profiles policy also queries profiles.
+-- Instead, we check the role directly in a way that doesn't cause recursion.
 DROP POLICY IF EXISTS "Superadministrator can view all notebooks" ON public.notebooks;
 CREATE POLICY "Superadministrator can view all notebooks"
     ON public.notebooks FOR SELECT
-    USING (public.is_superadministrator());
+    USING (
+        -- Check if current user is superadministrator by querying their own profile
+        -- This should not cause recursion because we're checking auth.uid() = id
+        -- which is a direct comparison that doesn't trigger RLS recursion
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'superadministrator'
+        )
+    );
 
 -- Users can view their own notebooks
 DROP POLICY IF EXISTS "Users can view their own notebooks" ON public.notebooks;
