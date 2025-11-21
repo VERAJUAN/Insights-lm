@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAllOrganizations } from '@/hooks/useAllOrganizations';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Users, BookOpen, Building2 } from 'lucide-react';
+import { Loader2, Users, BookOpen, Building2, MoreVertical, Copy, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,9 +17,47 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useNotebookDuplicate } from '@/hooks/useNotebookDuplicate';
+import { useNotebookReassign } from '@/hooks/useNotebookReassign';
+import { useNotebookDelete } from '@/hooks/useNotebookDelete';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const OrganizationsOverview = () => {
   const { organizations, isLoading, error } = useAllOrganizations();
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
+  const [showReassignDialog, setShowReassignDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
+  const [showDeleteDialog, setShowDeleteDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
+  const [selectedOrgForDuplicate, setSelectedOrgForDuplicate] = useState<string>('none');
+  const [selectedOrgForReassign, setSelectedOrgForReassign] = useState<string>('none');
+  
+  const { duplicateNotebook, isDuplicating } = useNotebookDuplicate();
+  const { reassignNotebook, isReassigning } = useNotebookReassign();
+  const { deleteNotebook, isDeleting } = useNotebookDelete();
+
+  // Fetch all organizations
+  const { data: allOrganizations = [] } = useQuery({
+    queryKey: ['allOrganizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching organizations:', error);
+        throw error;
+      }
+
+      return data || [];
+    },
+  });
 
   if (isLoading) {
     return (
@@ -36,6 +74,43 @@ const OrganizationsOverview = () => {
       </Card>
     );
   }
+
+  const handleDuplicateClick = (notebookId: string) => {
+    setShowDuplicateDialog({ notebookId, open: true });
+    setSelectedOrgForDuplicate('none');
+  };
+
+  const handleReassignClick = (notebookId: string) => {
+    setShowReassignDialog({ notebookId, open: true });
+    setSelectedOrgForReassign('none');
+  };
+
+  const handleDeleteClick = (notebookId: string) => {
+    setShowDeleteDialog({ notebookId, open: true });
+  };
+
+  const handleConfirmDuplicate = () => {
+    duplicateNotebook({
+      notebookId: showDuplicateDialog.notebookId,
+      targetOrganizationId: selectedOrgForDuplicate === 'none' ? null : selectedOrgForDuplicate,
+    });
+    setShowDuplicateDialog({ notebookId: '', open: false });
+    setSelectedOrgForDuplicate('none');
+  };
+
+  const handleConfirmReassign = () => {
+    reassignNotebook({
+      notebookId: showReassignDialog.notebookId,
+      targetOrganizationId: selectedOrgForReassign === 'none' ? null : selectedOrgForReassign,
+    });
+    setShowReassignDialog({ notebookId: '', open: false });
+    setSelectedOrgForReassign('none');
+  };
+
+  const handleConfirmDelete = () => {
+    deleteNotebook(showDeleteDialog.notebookId);
+    setShowDeleteDialog({ notebookId: '', open: false });
+  };
 
   if (error) {
     return (
@@ -141,6 +216,7 @@ const OrganizationsOverview = () => {
                               <TableRow>
                                 <TableHead>Título</TableHead>
                                 <TableHead>Creado</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -153,6 +229,48 @@ const OrganizationsOverview = () => {
                                       month: 'short',
                                       day: 'numeric',
                                     })}
+                                  </TableCell>
+                                  <TableCell>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem 
+                                          onSelect={(e) => {
+                                            e.preventDefault();
+                                            handleDuplicateClick(notebook.id);
+                                          }} 
+                                          className="cursor-pointer"
+                                        >
+                                          <Copy className="h-4 w-4 mr-2" />
+                                          Duplicar cuaderno
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          onSelect={(e) => {
+                                            e.preventDefault();
+                                            handleReassignClick(notebook.id);
+                                          }} 
+                                          className="cursor-pointer"
+                                        >
+                                          <Building2 className="h-4 w-4 mr-2" />
+                                          Reasignar organización
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          onSelect={(e) => {
+                                            e.preventDefault();
+                                            handleDeleteClick(notebook.id);
+                                          }} 
+                                          className="cursor-pointer text-red-600"
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Eliminar
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -180,6 +298,108 @@ const OrganizationsOverview = () => {
           </Accordion>
         )}
       </CardContent>
+
+      {/* Duplicate Dialog */}
+      <Dialog open={showDuplicateDialog.open} onOpenChange={(open) => setShowDuplicateDialog({ notebookId: '', open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicar Cuaderno</DialogTitle>
+            <DialogDescription>
+              Crea una copia de este cuaderno. Puedes asignarlo a una organización específica o dejarlo sin organización.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="duplicate-org">Organización de destino (Opcional)</Label>
+              <Select value={selectedOrgForDuplicate} onValueChange={setSelectedOrgForDuplicate}>
+                <SelectTrigger id="duplicate-org">
+                  <SelectValue placeholder="Sin organización" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin organización</SelectItem>
+                  {allOrganizations.map((org: any) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDuplicateDialog({ notebookId: '', open: false });
+              setSelectedOrgForDuplicate('none');
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmDuplicate} disabled={isDuplicating}>
+              {isDuplicating ? 'Duplicando...' : 'Duplicar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Dialog */}
+      <Dialog open={showReassignDialog.open} onOpenChange={(open) => setShowReassignDialog({ notebookId: '', open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reasignar Cuaderno</DialogTitle>
+            <DialogDescription>
+              Cambia la organización a la que pertenece este cuaderno.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reassign-org">Nueva Organización</Label>
+              <Select value={selectedOrgForReassign} onValueChange={setSelectedOrgForReassign}>
+                <SelectTrigger id="reassign-org">
+                  <SelectValue placeholder="Sin organización" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin organización</SelectItem>
+                  {allOrganizations.map((org: any) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowReassignDialog({ notebookId: '', open: false });
+              setSelectedOrgForReassign('none');
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmReassign} disabled={isReassigning}>
+              {isReassigning ? 'Reasignando...' : 'Reasignar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={showDeleteDialog.open} onOpenChange={(open) => setShowDeleteDialog({ notebookId: '', open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este cuaderno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar este cuaderno y todo su contenido. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog({ notebookId: '', open: false })}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
