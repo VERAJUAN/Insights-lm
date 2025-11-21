@@ -161,50 +161,48 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
   };
 };
 
-export const useChatMessages = (notebookId?: string) => {
+export const useChatMessages = (notebookId?: string, isPublic: boolean = false) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Always start with empty messages - don't load chat history
+  // Chat history is not persisted between sessions
   const {
     data: messages = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['chat-messages', notebookId],
+    queryKey: ['chat-messages', notebookId, isPublic],
     queryFn: async () => {
       if (!notebookId) return [];
       
-      const { data, error } = await supabase
-        .from('n8n_chat_histories')
-        .select('*')
-        .eq('session_id', notebookId)
-        .order('id', { ascending: true });
-
-      if (error) throw error;
+      // Delete any existing chat history when opening a notebook
+      // This ensures chats always start from zero
+      // Works for both authenticated users and public notebooks
+      try {
+        await supabase
+          .from('n8n_chat_histories')
+          .delete()
+          .eq('session_id', notebookId);
+        console.log('Cleared existing chat history for notebook:', notebookId);
+      } catch (deleteError) {
+        console.error('Error clearing chat history:', deleteError);
+        // Continue even if deletion fails
+      }
       
-      // Also fetch sources to get proper source titles
-      const { data: sourcesData } = await supabase
-        .from('sources')
-        .select('id, title, type')
-        .eq('notebook_id', notebookId);
-      
-      const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-      
-      console.log('Raw data from database:', data);
-      console.log('Sources map:', sourceMap);
-      
-      // Transform the data to match our expected format
-      return data.map((item) => transformMessage(item, sourceMap));
+      // Always return empty array - chats start fresh
+      return [];
     },
-    enabled: !!notebookId && !!user,
+    enabled: !!notebookId, // Enable for both authenticated and public notebooks
     refetchOnMount: true,
-    refetchOnReconnect: true,
+    refetchOnReconnect: false, // Don't refetch on reconnect to avoid clearing again
   });
 
   // Set up Realtime subscription for new messages
+  // Works for both authenticated users and public notebooks
   useEffect(() => {
-    if (!notebookId || !user) return;
+    if (!notebookId) return;
 
     console.log('Setting up Realtime subscription for notebook:', notebookId);
 
@@ -254,7 +252,7 @@ export const useChatMessages = (notebookId?: string) => {
       console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [notebookId, user, queryClient]);
+  }, [notebookId, queryClient]);
 
   const sendMessage = useMutation({
     mutationFn: async (messageData: {
@@ -262,14 +260,15 @@ export const useChatMessages = (notebookId?: string) => {
       role: 'user' | 'assistant';
       content: string;
     }) => {
-      if (!user) throw new Error('User not authenticated');
+      // For public notebooks, user_id can be null
+      const userId = user?.id || null;
 
       // Call the n8n webhook
       const webhookResponse = await supabase.functions.invoke('send-chat-message', {
         body: {
           session_id: messageData.notebookId,
           message: messageData.content,
-          user_id: user.id
+          user_id: userId
         }
       });
 
@@ -287,8 +286,6 @@ export const useChatMessages = (notebookId?: string) => {
 
   const deleteChatHistory = useMutation({
     mutationFn: async (notebookId: string) => {
-      if (!user) throw new Error('User not authenticated');
-
       console.log('Deleting chat history for notebook:', notebookId);
       
       const { error } = await supabase

@@ -49,7 +49,7 @@ const ChatArea = ({
     isSending,
     deleteChatHistory,
     isDeletingChatHistory
-  } = useChatMessages(notebookId);
+  } = useChatMessages(notebookId, isPublic);
   
   const { isReader } = useUserRole();
   const isReadOnly = isReader || isPublic;
