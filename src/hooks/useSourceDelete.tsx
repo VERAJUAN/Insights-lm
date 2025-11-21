@@ -11,7 +11,7 @@ export const useSourceDelete = () => {
 
   const deleteSource = useMutation({
     mutationFn: async (sourceId: string) => {
-      console.log('Starting source deletion process for:', sourceId);
+      console.log('Empezando el proceso de eliminación de la fuente:', sourceId);
       
       try {
         // First, get the source details including file information
@@ -22,69 +22,69 @@ export const useSourceDelete = () => {
           .single();
 
         if (fetchError) {
-          console.error('Error fetching source:', fetchError);
+          console.error('Error al obtener la fuente:', fetchError);
           throw new Error('Failed to find source');
         }
 
-        console.log('Found source to delete:', source.title, 'with file_path:', source.file_path);
+        console.log('Encontrada fuente para eliminar:', source.title, 'con file_path:', source.file_path);
 
         // Delete the file from storage if it exists
         if (source.file_path) {
-          console.log('Deleting file from storage:', source.file_path);
+          console.log('Eliminando archivo del almacenamiento:', source.file_path);
           
           const { error: storageError } = await supabase.storage
             .from('sources')
             .remove([source.file_path]);
 
           if (storageError) {
-            console.error('Error deleting file from storage:', storageError);
+            console.error('Error al eliminar archivo del almacenamiento:', storageError);
             // Don't throw here - we still want to delete the database record
             // even if the file deletion fails (file might already be gone)
           } else {
-            console.log('File deleted successfully from storage');
+            console.log('Archivo eliminado correctamente del almacenamiento');
           }
         } else {
-          console.log('No file to delete from storage (URL-based source or no file_path)');
+          console.log('No hay archivo que eliminar del almacenamiento (fuente URL o no file_path)');
         }
 
-        // Delete the source record from the database
+        // Eliminar el registro de la fuente de la base de datos
         const { error: deleteError } = await supabase
           .from('sources')
           .delete()
           .eq('id', sourceId);
 
         if (deleteError) {
-          console.error('Error deleting source from database:', deleteError);
+          console.error('Error al eliminar la fuente de la base de datos:', deleteError);
           throw deleteError;
         }
         
-        console.log('Source deleted successfully from database');
+        console.log('Fuente eliminada correctamente de la base de datos');
         return source;
       } catch (error) {
-        console.error('Error in source deletion process:', error);
+        console.error('Error en el proceso de eliminación de la fuente:', error);
         throw error;
       }
     },
     onSuccess: (deletedSource) => {
-      console.log('Delete mutation success, invalidating queries');
+      console.log('Eliminación de mutación exitosa, invalidando consultas');
       queryClient.invalidateQueries({ queryKey: ['sources'] });
       toast({
-        title: "Source deleted",
-        description: `"${deletedSource?.title || 'Source'}" has been successfully deleted.`,
+        title: "Fuente eliminada",
+        description: `"${deletedSource?.title || 'Fuente'}" ha sido eliminada correctamente.`,
       });
     },
     onError: (error: any) => {
-      console.error('Delete mutation error:', error);
+      console.error('Error en la mutación de eliminación:', error);
       
-      let errorMessage = "Failed to delete the source. Please try again.";
+      let errorMessage = "No se pudo eliminar la fuente. Por favor, inténtelo de nuevo.";
       
       // Provide more specific error messages based on the error type
       if (error?.code === 'PGRST116') {
-        errorMessage = "Source not found or you don't have permission to delete it.";
+        errorMessage = "Fuente no encontrada o no tienes permisos para eliminarla.";
       } else if (error?.message?.includes('foreign key')) {
-        errorMessage = "Cannot delete source due to data dependencies. Please contact support.";
+        errorMessage = "No se puede eliminar la fuente debido a dependencias de datos. Por favor, contacta al soporte.";
       } else if (error?.message?.includes('network')) {
-        errorMessage = "Network error. Please check your connection and try again.";
+        errorMessage = "Error de red. Por favor, verifica tu conexión y vuelve a intentarlo.";
       }
       
       toast({
