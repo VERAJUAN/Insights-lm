@@ -34,7 +34,7 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
       // For AI responses with citations, save the structured content as JSON
       contentText = JSON.stringify(content);
       // Generate title from the first segment's text
-      const firstSegmentText = content.segments[0]?.text || 'AI Response';
+      const firstSegmentText = content.segments[0]?.text || 'AI Respuesta';
       title = firstSegmentText.length > 50 ? firstSegmentText.substring(0, 47) + '...' : firstSegmentText;
       source_type = 'ai_response';
       

@@ -304,7 +304,7 @@ const StudioSidebar = ({
                 <div className="flex items-center space-x-2 mb-1">
                   {note.source_type === 'ai_response' ? <Bot className="h-3 w-3 text-blue-600" /> : <User className="h-3 w-3 text-gray-600" />}
                   <span className="text-xs text-gray-500 uppercase">
-                    {note.source_type === 'ai_response' ? 'AI Response' : 'Note'}
+                    {note.source_type === 'ai_response' ? 'AI Respuesta' : 'Nota'}
                   </span>
                 </div>
                 <h4 className="font-medium text-gray-900 truncate">{note.title}</h4>
