@@ -129,6 +129,7 @@ export const useNotebookDuplicate = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['allOrganizationsWithDetails'] });
       toast({
         title: 'Cuaderno duplicado',
         description: 'El cuaderno ha sido duplicado exitosamente.',

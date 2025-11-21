@@ -125,9 +125,9 @@ const NotebookCard = ({
   const borderClass = `border-${colorName}-200`;
 
   return <div 
-      className={`rounded-lg border ${borderClass} ${backgroundClass} p-4 hover:shadow-md transition-shadow cursor-pointer relative h-48 flex flex-col`}
+      className={`rounded-lg border ${borderClass} ${backgroundClass} p-6 hover:shadow-md transition-shadow cursor-pointer relative flex flex-col min-h-[180px]`}
     >
-      <div className="absolute top-3 right-3 flex items-center gap-1" data-delete-action="true">
+      <div className="absolute top-4 right-4 flex items-center gap-1" data-delete-action="true">
         {isSuperadministrator && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -190,7 +190,7 @@ const NotebookCard = ({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
+                <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white" disabled={isDeleting}>
                   {isDeleting ? 'Eliminando...' : 'Eliminar'}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -301,23 +301,23 @@ const NotebookCard = ({
         </DialogContent>
       </Dialog>
       
-      <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+      <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-5">
         <span className="text-3xl">{notebook.icon}</span>
       </div>
       
-      <h3 className="text-gray-900 mb-2 pr-6 line-clamp-2 text-2xl font-normal flex-grow">
+      <h3 className="text-gray-900 mb-3 pr-8 text-2xl font-normal break-words">
         {notebook.title}
       </h3>
       
       {notebook.organizationName && (
-        <div className="mb-2">
+        <div className="mb-3">
           <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
             {notebook.organizationName}
           </span>
         </div>
       )}
       
-      <div className="flex items-center justify-between text-sm text-gray-500 mt-auto">
+      <div className="flex items-center justify-between text-sm text-gray-500 mt-auto pt-2">
         <span>{notebook.date} • {notebook.sources} fuente{notebook.sources !== 1 ? 's' : ''}</span>
       </div>
     </div>;

@@ -394,7 +394,7 @@ const OrganizationsOverview = () => {
             <AlertDialogCancel onClick={() => setShowDeleteDialog({ notebookId: '', open: false })}>
               Cancelar
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white" disabled={isDeleting}>
               {isDeleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>

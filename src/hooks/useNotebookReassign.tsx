@@ -32,6 +32,7 @@ export const useNotebookReassign = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['allOrganizationsWithDetails'] });
       toast({
         title: 'Cuaderno reasignado',
         description: 'El cuaderno ha sido reasignado exitosamente.',
