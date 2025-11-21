@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useNotebookDuplicate } from '@/hooks/useNotebookDuplicate';
 import { useNotebookReassign } from '@/hooks/useNotebookReassign';
@@ -33,7 +34,8 @@ const OrganizationsOverview = () => {
   const { organizations, isLoading, error } = useAllOrganizations();
   const [showDuplicateDialog, setShowDuplicateDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
   const [showReassignDialog, setShowReassignDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
-  const [showDeleteDialog, setShowDeleteDialog] = useState<{ notebookId: string; open: boolean }>({ notebookId: '', open: false });
+  const [showDeleteDialog, setShowDeleteDialog] = useState<{ notebookId: string; notebookTitle: string; open: boolean }>({ notebookId: '', notebookTitle: '', open: false });
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
   const [selectedOrgForDuplicate, setSelectedOrgForDuplicate] = useState<string>('none');
   const [selectedOrgForReassign, setSelectedOrgForReassign] = useState<string>('none');
   
@@ -86,7 +88,12 @@ const OrganizationsOverview = () => {
   };
 
   const handleDeleteClick = (notebookId: string) => {
-    setShowDeleteDialog({ notebookId, open: true });
+    // Find the notebook title
+    const notebook = organizations
+      .flatMap(org => org.notebooks)
+      .find(nb => nb.id === notebookId);
+    setShowDeleteDialog({ notebookId, notebookTitle: notebook?.title || '', open: true });
+    setDeleteConfirmationText('');
   };
 
   const handleConfirmDuplicate = () => {
@@ -108,8 +115,12 @@ const OrganizationsOverview = () => {
   };
 
   const handleConfirmDelete = () => {
+    if (deleteConfirmationText !== 'ELIMINAR') {
+      return;
+    }
     deleteNotebook(showDeleteDialog.notebookId);
-    setShowDeleteDialog({ notebookId: '', open: false });
+    setShowDeleteDialog({ notebookId: '', notebookTitle: '', open: false });
+    setDeleteConfirmationText('');
   };
 
   if (error) {
@@ -382,24 +393,51 @@ const OrganizationsOverview = () => {
       </Dialog>
 
       {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog.open} onOpenChange={(open) => setShowDeleteDialog({ notebookId: '', open })}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este cuaderno?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Estás a punto de eliminar este cuaderno y todo su contenido. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDeleteDialog({ notebookId: '', open: false })}>
+      <Dialog open={showDeleteDialog.open} onOpenChange={(open) => {
+        setShowDeleteDialog({ notebookId: '', notebookTitle: '', open });
+        setDeleteConfirmationText('');
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar este cuaderno?</DialogTitle>
+            <DialogDescription>
+              Estás a punto de eliminar el cuaderno <strong>"{showDeleteDialog.notebookTitle}"</strong> y todo su contenido. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation">
+                Para confirmar, escribe <strong>ELIMINAR</strong> en el campo siguiente:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="ELIMINAR"
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog({ notebookId: '', notebookTitle: '', open: false });
+                setDeleteConfirmationText('');
+              }}
+            >
               Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white" disabled={isDeleting}>
+            </Button>
+            <Button 
+              onClick={handleConfirmDelete} 
+              className="bg-red-600 hover:bg-red-700 text-white" 
+              disabled={isDeleting || deleteConfirmationText !== 'ELIMINAR'}
+            >
               {isDeleting ? 'Eliminando...' : 'Eliminar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

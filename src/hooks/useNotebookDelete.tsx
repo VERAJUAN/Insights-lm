@@ -91,8 +91,8 @@ export const useNotebookDelete = () => {
       queryClient.invalidateQueries({ queryKey: ['notebook', notebookId] });
       
       toast({
-        title: "Notebook deleted",
-        description: `"${deletedNotebook?.title || 'Notebook'}" and all its sources have been successfully deleted.`,
+        title: "Cuaderno eliminado",
+        description: `"${deletedNotebook?.title || 'Cuaderno'}" y todos sus fuentes han sido eliminados correctamente.`,
       });
     },
     onError: (error: any) => {

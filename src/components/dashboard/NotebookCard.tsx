@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useNotebookDelete } from '@/hooks/useNotebookDelete';
 import { useNotebookDuplicate } from '@/hooks/useNotebookDuplicate';
@@ -31,6 +32,7 @@ const NotebookCard = ({
 }: NotebookCardProps) => {
   const { isSuperadministrator } = useUserRole();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showReassignDialog, setShowReassignDialog] = useState(false);
   const [selectedOrgForDuplicate, setSelectedOrgForDuplicate] = useState<string>('none');
@@ -75,14 +77,19 @@ const NotebookCard = ({
     e.preventDefault();
     console.log('Delete button clicked for notebook:', notebook.id);
     setShowDeleteDialog(true);
+    setDeleteConfirmationText('');
   };
 
   const handleConfirmDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (deleteConfirmationText !== 'ELIMINAR') {
+      return;
+    }
     console.log('Confirming delete for notebook:', notebook.id);
     deleteNotebook(notebook.id);
     setShowDeleteDialog(false);
+    setDeleteConfirmationText('');
   };
 
   const handleDuplicateClick = (e: React.MouseEvent) => {
@@ -175,49 +182,58 @@ const NotebookCard = ({
           </DropdownMenu>
         )}
         {!isSuperadministrator && (
-          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <AlertDialogTrigger asChild>
-              <button onClick={handleDeleteClick} className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors delete-button" disabled={isDeleting} data-delete-action="true">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Eliminar este cuaderno?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Estás a punto de eliminar este cuaderno y todo su contenido. Esta acción no se puede deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white" disabled={isDeleting}>
-                  {isDeleting ? 'Eliminando...' : 'Eliminar'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <button onClick={handleDeleteClick} className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors delete-button" disabled={isDeleting} data-delete-action="true">
+            <Trash2 className="h-4 w-4" />
+          </button>
         )}
       </div>
 
-      {/* Delete Dialog for superadministrator */}
-      {isSuperadministrator && (
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar este cuaderno?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Estás a punto de eliminar este cuaderno y todo su contenido. Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
-                {isDeleting ? 'Eliminando...' : 'Eliminar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* Delete Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open);
+        setDeleteConfirmationText('');
+      }}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar este cuaderno?</DialogTitle>
+            <DialogDescription>
+              Estás a punto de eliminar el cuaderno <strong>"{notebook.title}"</strong> y todo su contenido. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation">
+                Para confirmar, escribe <strong>ELIMINAR</strong> en el campo siguiente:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="ELIMINAR"
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteConfirmationText('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleConfirmDelete} 
+              className="bg-red-600 hover:bg-red-700 text-white" 
+              disabled={isDeleting || deleteConfirmationText !== 'ELIMINAR'}
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Duplicate Dialog */}
       <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
