@@ -25,13 +25,15 @@ interface ChatAreaProps {
     example_questions?: string[];
   } | null;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
 const ChatArea = ({
   hasSource,
   notebookId,
   notebook,
-  onCitationClick
+  onCitationClick,
+  isPublic = false
 }: ChatAreaProps) => {
   const [message, setMessage] = useState('');
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
@@ -50,6 +52,7 @@ const ChatArea = ({
   } = useChatMessages(notebookId);
   
   const { isReader } = useUserRole();
+  const isReadOnly = isReader || isPublic;
   const {
     sources
   } = useSources(notebookId);
@@ -57,9 +60,9 @@ const ChatArea = ({
   const sourceCount = sources?.length || 0;
 
   // Check if at least one source has been successfully processed
-  // For readers, assume sources are processed if they have access to the notebook
-  const hasProcessedSource = isReader 
-    ? true // Readers can chat if they have access to the notebook (assumes sources are processed)
+  // For readers and public users, assume sources are processed if they have access to the notebook
+  const hasProcessedSource = isReadOnly 
+    ? true // Readers and public users can chat if they have access to the notebook (assumes sources are processed)
     : sources?.some(source => source.processing_status === 'completed') || false;
 
   // Chat should be disabled if there are no processed sources (except for readers)
@@ -162,7 +165,7 @@ const ChatArea = ({
 
   // Update placeholder text based on processing status
   const getPlaceholderText = () => {
-    if (isReader) {
+    if (isReadOnly) {
       return "Escribe tu pregunta...";
     }
     if (isChatDisabled) {
@@ -291,9 +294,9 @@ const ChatArea = ({
               <Upload className="h-8 w-8 text-slate-600" />
             </div>
             <h2 className="text-xl font-medium text-gray-900 mb-4">
-              {isReader ? 'Chat con el cuaderno' : 'Agrega una fuente para comenzar'}
+              {isReadOnly ? 'Chat con el cuaderno' : 'Agrega una fuente para comenzar'}
             </h2>
-            {!isReader && (
+            {!isReadOnly && (
               <Button onClick={() => setShowAddSourcesDialog(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Subir una fuente

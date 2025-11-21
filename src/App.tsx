@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Notebook from "./pages/Notebook";
+import PublicNotebook from "./pages/PublicNotebook";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,10 @@ const AppContent = () => {
             <Notebook />
           </ProtectedRoute>
         } 
+      />
+      <Route 
+        path="/public/notebook/:slug" 
+        element={<PublicNotebook />} 
       />
       <Route path="/auth" element={<Auth />} />
       <Route path="*" element={<NotFound />} />

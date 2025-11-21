@@ -60,7 +60,9 @@ export type Database = {
           generation_status: string | null
           icon: string | null
           id: string
+          is_public: boolean
           organization_id: string | null
+          public_slug: string | null
           title: string
           updated_at: string
           user_id: string
@@ -76,7 +78,9 @@ export type Database = {
           generation_status?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
           organization_id?: string | null
+          public_slug?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -92,7 +96,9 @@ export type Database = {
           generation_status?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
           organization_id?: string | null
+          public_slug?: string | null
           title?: string
           updated_at?: string
           user_id?: string

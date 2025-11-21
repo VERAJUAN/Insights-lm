@@ -155,9 +155,13 @@ const NotebookAssignment = () => {
     assignNotebook.mutate({ notebookId: selectedNotebookId, userId: selectedUserId });
   };
 
-  const organizationNotebooks = notebooks.filter(n => 
-    isSuperadministrator || (isAdministrator && n.organization_id === organizationId)
-  );
+  const organizationNotebooks = notebooks.filter(n => {
+    // Filter by organization
+    const matchesOrganization = isSuperadministrator || (isAdministrator && n.organization_id === organizationId);
+    // Exclude public notebooks (they can't be assigned to readers)
+    const isNotPublic = !n.is_public;
+    return matchesOrganization && isNotPublic;
+  });
 
   const availableReaders = readers.filter(reader => 
     !assignments.some(a => a.user_id === reader.id)

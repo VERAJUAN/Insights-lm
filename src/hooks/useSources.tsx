@@ -33,7 +33,7 @@ export const useSources = (notebookId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!notebookId && !isReader,
+    enabled: !!notebookId && !isReader, // Public notebooks can fetch sources (read-only)
   });
 
   // Set up Realtime subscription for sources table

@@ -16,12 +16,14 @@ interface StudioSidebarProps {
   notebookId?: string;
   isExpanded?: boolean;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
 const StudioSidebar = ({
   notebookId,
   isExpanded,
-  onCitationClick
+  onCitationClick,
+  isPublic = false
 }: StudioSidebarProps) => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
