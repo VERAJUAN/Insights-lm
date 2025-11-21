@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Search, UserCog } from 'lucide-react';
+import { Loader2, Search, UserCog, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -29,6 +29,12 @@ const UserManagement = () => {
   const [selectedRole, setSelectedRole] = useState<'superadministrator' | 'administrator' | 'reader'>('reader');
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserFullName, setNewUserFullName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'administrator' | 'reader'>('reader');
+  const [newUserOrganizationId, setNewUserOrganizationId] = useState<string>('');
 
   // Fetch all users (only for superadministrator)
   const { data: users = [], isLoading: isLoadingUsers } = useQuery({
@@ -124,6 +130,81 @@ const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const createUser = useMutation({
+    mutationFn: async ({
+      email,
+      password,
+      fullName,
+      role,
+      organizationId,
+    }: {
+      email: string;
+      password: string;
+      fullName: string;
+      role: 'administrator' | 'reader';
+      organizationId: string;
+    }) => {
+      // Create user in auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (authError) {
+        console.error('Error creating user in auth:', authError);
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error('No se pudo crear el usuario');
+      }
+
+      // Update profile with role and organization
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          role,
+          organization_id: organizationId,
+          full_name: fullName,
+        })
+        .eq('id', authData.user.id)
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        throw profileError;
+      }
+
+      return profileData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      setIsCreateDialogOpen(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserFullName('');
+      setNewUserRole('reader');
+      setNewUserOrganizationId('');
+      toast({
+        title: 'Usuario creado',
+        description: 'El usuario ha sido creado exitosamente. Se ha enviado un email de confirmación.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error al crear usuario',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleSave = () => {
     if (!selectedUserId) return;
 
@@ -131,6 +212,34 @@ const UserManagement = () => {
       userId: selectedUserId,
       role: selectedRole,
       organizationId: selectedRole !== 'superadministrator' ? selectedOrganizationId : undefined,
+    });
+  };
+
+  const handleCreateUser = () => {
+    if (!newUserEmail.trim() || !newUserPassword.trim()) {
+      toast({
+        title: 'Campos requeridos',
+        description: 'Por favor completa el email y la contraseña.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if ((newUserRole === 'administrator' || newUserRole === 'reader') && !newUserOrganizationId) {
+      toast({
+        title: 'Organización requerida',
+        description: 'Por favor selecciona una organización para este usuario.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createUser.mutate({
+      email: newUserEmail.trim(),
+      password: newUserPassword,
+      fullName: newUserFullName.trim() || '',
+      role: newUserRole,
+      organizationId: newUserOrganizationId,
     });
   };
 
@@ -170,6 +279,101 @@ const UserManagement = () => {
               className="pl-8"
             />
           </div>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Crear Usuario
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                <DialogDescription>
+                  Crea un nuevo usuario y asígnalo a una organización como administrador o lector.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-email">Email *</Label>
+                  <Input
+                    id="new-email"
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="usuario@ejemplo.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Contraseña *</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-fullname">Nombre Completo</Label>
+                  <Input
+                    id="new-fullname"
+                    value={newUserFullName}
+                    onChange={(e) => setNewUserFullName(e.target.value)}
+                    placeholder="Nombre del usuario"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-role">Rol *</Label>
+                  <Select value={newUserRole} onValueChange={(value: any) => setNewUserRole(value)}>
+                    <SelectTrigger id="new-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="administrator">Administrador</SelectItem>
+                      <SelectItem value="reader">Lector</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-organization">Organización *</Label>
+                  <Select
+                    value={newUserOrganizationId}
+                    onValueChange={setNewUserOrganizationId}
+                  >
+                    <SelectTrigger id="new-organization">
+                      <SelectValue placeholder="Selecciona una organización" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations.map((org: any) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreateUser}
+                  disabled={createUser.isPending || !newUserEmail.trim() || !newUserPassword.trim() || !newUserOrganizationId}
+                >
+                  {createUser.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Crear Usuario'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {isLoadingUsers ? (
