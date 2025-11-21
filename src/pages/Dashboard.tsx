@@ -1,14 +1,22 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import NotebookGrid from '@/components/dashboard/NotebookGrid';
 import EmptyDashboard from '@/components/dashboard/EmptyDashboard';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import OrganizationPromptEditor from '@/components/admin/OrganizationPromptEditor';
+import NotebookAssignment from '@/components/admin/NotebookAssignment';
+import UserManagement from '@/components/admin/UserManagement';
+import { Settings, Users, FileText, BookOpen } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, loading: authLoading, error: authError } = useAuth();
   const { notebooks, isLoading, error, isError } = useNotebooks();
+  const { isSuperadministrator, isAdministrator, isReader } = useUserRole();
+  const [activeTab, setActiveTab] = useState('notebooks');
   const hasNotebooks = notebooks && notebooks.length > 0;
 
   // Show loading while auth is initializing
@@ -93,6 +101,8 @@ const Dashboard = () => {
     );
   }
 
+  const showAdminTabs = isSuperadministrator || isAdministrator;
+
   return (
     <div className="min-h-screen bg-white">
       <DashboardHeader userEmail={user?.email} />
@@ -102,7 +112,59 @@ const Dashboard = () => {
           <h1 className="font-medium text-gray-900 mb-2 text-5xl">Bienvenido a CampusLM</h1>
         </div>
 
-        {hasNotebooks ? <NotebookGrid /> : <EmptyDashboard />}
+        {showAdminTabs ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-4">
+              <TabsTrigger value="notebooks" className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Cuadernos</span>
+              </TabsTrigger>
+              {isAdministrator && (
+                <>
+                  <TabsTrigger value="prompt" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">Prompt</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="assignments" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Asignaciones</span>
+                  </TabsTrigger>
+                </>
+              )}
+              {isSuperadministrator && (
+                <TabsTrigger value="users" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Usuarios</span>
+                </TabsTrigger>
+              )}
+            </TabsList>
+
+            <TabsContent value="notebooks" className="mt-6">
+              {hasNotebooks ? <NotebookGrid /> : <EmptyDashboard />}
+            </TabsContent>
+
+            {isAdministrator && (
+              <>
+                <TabsContent value="prompt" className="mt-6">
+                  <OrganizationPromptEditor />
+                </TabsContent>
+                <TabsContent value="assignments" className="mt-6">
+                  <NotebookAssignment />
+                </TabsContent>
+              </>
+            )}
+
+            {isSuperadministrator && (
+              <TabsContent value="users" className="mt-6">
+                <UserManagement />
+              </TabsContent>
+            )}
+          </Tabs>
+        ) : (
+          <div>
+            {hasNotebooks ? <NotebookGrid /> : <EmptyDashboard />}
+          </div>
+        )}
       </main>
     </div>
   );

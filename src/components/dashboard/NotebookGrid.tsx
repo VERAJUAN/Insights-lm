@@ -19,7 +19,10 @@ const NotebookGrid = () => {
     notebooks,
     isLoading,
     createNotebook,
-    isCreating
+    isCreating,
+    canCreate,
+    notebookCount,
+    maxNotebooks
   } = useNotebooks();
   const navigate = useNavigate();
 
@@ -71,9 +74,21 @@ const NotebookGrid = () => {
 
   return <div>
       <div className="flex items-center justify-between mb-8">
-        <Button className="bg-black hover:bg-gray-800 text-white rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
-          {isCreating ? 'Creando...' : '+ Crear nuevo'}
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button 
+            className="bg-black hover:bg-gray-800 text-white rounded-full px-6" 
+            onClick={handleCreateNotebook} 
+            disabled={isCreating || !canCreate}
+            title={!canCreate && maxNotebooks ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
+          >
+            {isCreating ? 'Creando...' : '+ Crear nuevo'}
+          </Button>
+          {maxNotebooks && (
+            <span className="text-sm text-gray-500">
+              {notebookCount} / {maxNotebooks} cuadernos
+            </span>
+          )}
+        </div>
         
         <div className="flex items-center space-x-4">
           <DropdownMenu>

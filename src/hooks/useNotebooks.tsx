@@ -3,9 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from './useUserRole';
+import { canCreateNotebook, MAX_NOTEBOOKS_FOR_ADMINISTRATOR } from '@/utils/permissions';
+import { toast } from '@/hooks/use-toast';
 
 export const useNotebooks = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { role, organizationId, isSuperadministrator, isAdministrator, isReader } = useUserRole();
   const queryClient = useQueryClient();
 
   const {
@@ -14,20 +18,45 @@ export const useNotebooks = () => {
     error,
     isError,
   } = useQuery({
-    queryKey: ['notebooks', user?.id],
+    queryKey: ['notebooks', user?.id, role],
     queryFn: async () => {
       if (!user) {
         console.log('No user found, returning empty notebooks array');
         return [];
       }
       
-      console.log('Fetching notebooks for user:', user.id);
+      console.log('Fetching notebooks for user:', user.id, 'role:', role);
       
-      // First get the notebooks
-      const { data: notebooksData, error: notebooksError } = await supabase
+      let query = supabase
         .from('notebooks')
-        .select('*')
-        .eq('user_id', user.id)
+        .select('*');
+
+      // Filter notebooks based on role
+      if (isSuperadministrator) {
+        // Superadministrator can see all notebooks
+        // No filter needed - RLS will handle it
+      } else if (isAdministrator) {
+        // Administrator can see notebooks from their organization
+        query = query.eq('organization_id', organizationId);
+      } else if (isReader) {
+        // Reader can only see assigned notebooks
+        const { data: assignments } = await supabase
+          .from('notebook_assignments')
+          .select('notebook_id')
+          .eq('user_id', user.id);
+
+        if (!assignments || assignments.length === 0) {
+          return [];
+        }
+
+        const notebookIds = assignments.map(a => a.notebook_id);
+        query = query.in('id', notebookIds);
+      } else {
+        // Default: user's own notebooks
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data: notebooksData, error: notebooksError } = await query
         .order('updated_at', { ascending: false });
 
       if (notebooksError) {
@@ -99,21 +128,37 @@ export const useNotebooks = () => {
   const createNotebook = useMutation({
     mutationFn: async (notebookData: { title: string; description?: string }) => {
       console.log('Creating notebook with data:', notebookData);
-      console.log('Current user:', user?.id);
+      console.log('Current user:', user?.id, 'role:', role);
       
       if (!user) {
         console.error('User not authenticated');
         throw new Error('User not authenticated');
       }
 
+      // Check if user can create notebooks
+      if (!canCreateNotebook(role, notebooks.length)) {
+        if (isAdministrator && notebooks.length >= MAX_NOTEBOOKS_FOR_ADMINISTRATOR) {
+          throw new Error(`Has alcanzado el límite de ${MAX_NOTEBOOKS_FOR_ADMINISTRATOR} cuadernos permitidos para administradores.`);
+        }
+        throw new Error('No tienes permisos para crear cuadernos.');
+      }
+
+      // Prepare notebook data
+      const insertData: any = {
+        title: notebookData.title,
+        description: notebookData.description,
+        user_id: user.id,
+        generation_status: 'pending',
+      };
+
+      // Add organization_id if user is administrator
+      if (isAdministrator && organizationId) {
+        insertData.organization_id = organizationId;
+      }
+
       const { data, error } = await supabase
         .from('notebooks')
-        .insert({
-          title: notebookData.title,
-          description: notebookData.description,
-          user_id: user.id,
-          generation_status: 'pending',
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -127,10 +172,15 @@ export const useNotebooks = () => {
     },
     onSuccess: (data) => {
       console.log('Mutation success, invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id, role] });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Mutation error:', error);
+      toast({
+        title: 'Error al crear cuaderno',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -141,5 +191,8 @@ export const useNotebooks = () => {
     isError,
     createNotebook: createNotebook.mutate,
     isCreating: createNotebook.isPending,
+    canCreate: canCreateNotebook(role, notebooks.length),
+    notebookCount: notebooks.length,
+    maxNotebooks: isAdministrator ? MAX_NOTEBOOKS_FOR_ADMINISTRATOR : null,
   };
 };
