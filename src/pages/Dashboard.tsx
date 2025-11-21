@@ -125,7 +125,7 @@ const Dashboard = () => {
 
         {showAdminTabs ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+            <TabsList className={`grid w-full ${isAdministrator ? 'grid-cols-4 lg:grid-cols-4' : 'grid-cols-3 lg:grid-cols-6'}`}>
               <TabsTrigger value="notebooks" className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
                 <span className="hidden sm:inline">Cuadernos</span>
@@ -139,6 +139,10 @@ const Dashboard = () => {
                   <TabsTrigger value="assignments" className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     <span className="hidden sm:inline">Asignaciones</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="users" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden sm:inline">Usuarios</span>
                   </TabsTrigger>
                 </>
               )}
@@ -180,6 +184,9 @@ const Dashboard = () => {
                 </TabsContent>
                 <TabsContent value="assignments" className="mt-6">
                   <NotebookAssignment />
+                </TabsContent>
+                <TabsContent value="users" className="mt-6">
+                  <UserManagement />
                 </TabsContent>
               </>
             )}
