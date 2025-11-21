@@ -17,12 +17,12 @@ import { Settings, Users, FileText, BookOpen, Building2 } from 'lucide-react';
 const Dashboard = () => {
   const { user, loading: authLoading, error: authError } = useAuth();
   const { notebooks, isLoading, error, isError } = useNotebooks();
-  const { isSuperadministrator, isAdministrator, isReader } = useUserRole();
+  const { isSuperadministrator, isAdministrator, isReader, isLoading: isLoadingRole } = useUserRole();
   const [activeTab, setActiveTab] = useState('notebooks');
   const hasNotebooks = notebooks && notebooks.length > 0;
 
-  // Show loading while auth is initializing
-  if (authLoading) {
+  // Show loading while auth or role is initializing
+  if (authLoading || isLoadingRole) {
     return (
       <div className="min-h-screen bg-gray-50">
         <DashboardHeader userEmail={user?.email} />
@@ -103,7 +103,7 @@ const Dashboard = () => {
     );
   }
 
-  const showAdminTabs = isSuperadministrator || isAdministrator;
+  const showAdminTabs = (isSuperadministrator || isAdministrator) && !isLoadingRole;
 
   return (
     <div className="min-h-screen bg-white">

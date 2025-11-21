@@ -417,11 +417,53 @@ ALTER TABLE public.sources REPLICA IDENTITY FULL;
 ALTER TABLE public.notes REPLICA IDENTITY FULL;
 ALTER TABLE public.n8n_chat_histories REPLICA IDENTITY FULL;
 
--- Add tables to realtime publication
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notebooks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sources;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.n8n_chat_histories;
+-- Add tables to realtime publication (if not already added)
+DO $$
+BEGIN
+    -- Add notebooks to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'notebooks'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.notebooks;
+    END IF;
+
+    -- Add sources to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'sources'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.sources;
+    END IF;
+
+    -- Add notes to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'notes'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
+    END IF;
+
+    -- Add n8n_chat_histories to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'n8n_chat_histories'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.n8n_chat_histories;
+    END IF;
+END $$;
 
 -- =============================================
 -- Storage Buckets and Policies Migration
@@ -469,6 +511,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- =============================================
 
 -- Sources bucket policies (private - users can only access their own files)
+DROP POLICY IF EXISTS "Users can view their own source files" ON storage.objects;
 CREATE POLICY "Users can view their own source files"
 ON storage.objects FOR SELECT
 USING (
@@ -478,6 +521,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Users can upload source files to their notebooks" ON storage.objects;
 CREATE POLICY "Users can upload source files to their notebooks"
 ON storage.objects FOR INSERT
 WITH CHECK (
@@ -487,6 +531,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Users can update their own source files" ON storage.objects;
 CREATE POLICY "Users can update their own source files"
 ON storage.objects FOR UPDATE
 USING (
@@ -496,6 +541,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Users can delete their own source files" ON storage.objects;
 CREATE POLICY "Users can delete their own source files"
 ON storage.objects FOR DELETE
 USING (
@@ -510,6 +556,7 @@ USING (
 -- =============================================
 
 -- Audio bucket policies (private - users can only access their own audio files)
+DROP POLICY IF EXISTS "Users can view their own audio files" ON storage.objects;
 CREATE POLICY "Users can view their own audio files"
 ON storage.objects FOR SELECT
 USING (
@@ -519,6 +566,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Service role can manage audio files" ON storage.objects;
 CREATE POLICY "Service role can manage audio files"
 ON storage.objects FOR ALL
 USING (
@@ -526,6 +574,7 @@ USING (
   auth.role() = 'service_role'
 );
 
+DROP POLICY IF EXISTS "Users can delete their own audio files" ON storage.objects;
 CREATE POLICY "Users can delete their own audio files"
 ON storage.objects FOR DELETE
 USING (
@@ -540,10 +589,12 @@ USING (
 -- =============================================
 
 -- Public images bucket policies (public - anyone can read)
+DROP POLICY IF EXISTS "Anyone can view public images" ON storage.objects;
 CREATE POLICY "Anyone can view public images"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'public-images');
 
+DROP POLICY IF EXISTS "Service role can manage public images" ON storage.objects;
 CREATE POLICY "Service role can manage public images"
 ON storage.objects FOR ALL
 USING (

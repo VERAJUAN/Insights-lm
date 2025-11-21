@@ -79,10 +79,12 @@ CREATE INDEX IF NOT EXISTS idx_notebooks_organization_id ON public.notebooks(org
 -- ============================================================================
 
 -- Function to check if user is superadministrator
+-- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_superadministrator()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
@@ -93,10 +95,12 @@ AS $$
 $$;
 
 -- Function to check if user is administrator
+-- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_administrator()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
@@ -107,10 +111,12 @@ AS $$
 $$;
 
 -- Function to check if user is reader
+-- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.is_reader()
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT EXISTS (
         SELECT 1 
@@ -121,56 +127,83 @@ AS $$
 $$;
 
 -- Function to get user's organization_id
+-- Uses SECURITY DEFINER and SET search_path to avoid RLS recursion
 CREATE OR REPLACE FUNCTION public.get_user_organization_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT organization_id 
     FROM public.profiles 
     WHERE id = auth.uid();
 $$;
 
--- Function to check if user can access a notebook
+-- Function to check if user can access a notebook (for use in sources, notes, etc.)
+-- NOTE: This function should NOT be used in notebooks RLS policies to avoid recursion
 CREATE OR REPLACE FUNCTION public.can_access_notebook(notebook_id_param uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
-    SELECT 
-        -- Superadministrator can access all notebooks
-        public.is_superadministrator()
-        OR
-        -- User owns the notebook
-        EXISTS (
+DECLARE
+    current_user_id uuid;
+    user_role_val text;
+    user_org_id uuid;
+BEGIN
+    current_user_id := auth.uid();
+    IF current_user_id IS NULL THEN
+        RETURN false;
+    END IF;
+
+    -- Get user role and organization
+    SELECT role, organization_id INTO user_role_val, user_org_id
+    FROM public.profiles
+    WHERE id = current_user_id;
+
+    -- Superadministrator can access all notebooks
+    IF user_role_val = 'superadministrator' THEN
+        RETURN true;
+    END IF;
+
+    -- Check if user owns the notebook (directly check without using notebooks table in policy context)
+    -- This is safe because we're checking ownership by user_id
+    IF EXISTS (
+        SELECT 1 
+        FROM public.notebooks 
+        WHERE id = notebook_id_param 
+        AND user_id = current_user_id
+    ) THEN
+        RETURN true;
+    END IF;
+
+    -- Administrator can access notebooks from their organization
+    IF user_role_val = 'administrator' AND user_org_id IS NOT NULL THEN
+        IF EXISTS (
             SELECT 1 
             FROM public.notebooks 
             WHERE id = notebook_id_param 
-            AND user_id = auth.uid()
-        )
-        OR
-        -- Administrator can access notebooks from their organization
-        (
-            public.is_administrator()
-            AND EXISTS (
-                SELECT 1 
-                FROM public.notebooks n
-                INNER JOIN public.profiles p ON n.organization_id = p.organization_id
-                WHERE n.id = notebook_id_param 
-                AND p.id = auth.uid()
-            )
-        )
-        OR
-        -- Reader can access assigned notebooks
-        (
-            public.is_reader()
-            AND EXISTS (
-                SELECT 1 
-                FROM public.notebook_assignments 
-                WHERE notebook_id = notebook_id_param 
-                AND user_id = auth.uid()
-            )
-        );
+            AND organization_id = user_org_id
+        ) THEN
+            RETURN true;
+        END IF;
+    END IF;
+
+    -- Reader can access assigned notebooks
+    IF user_role_val = 'reader' THEN
+        IF EXISTS (
+            SELECT 1 
+            FROM public.notebook_assignments 
+            WHERE notebook_id = notebook_id_param 
+            AND user_id = current_user_id
+        ) THEN
+            RETURN true;
+        END IF;
+    END IF;
+
+    RETURN false;
+END;
 $$;
 
 -- Function to check if user belongs to same organization as notebook
@@ -424,11 +457,19 @@ CREATE POLICY "Users can update their own profile"
 -- UPDATE EXISTING NOTEBOOKS POLICIES
 -- ============================================================================
 
--- Drop old policies
+-- Drop ALL existing policies on notebooks to avoid conflicts
 DROP POLICY IF EXISTS "Users can view their own notebooks" ON public.notebooks;
 DROP POLICY IF EXISTS "Users can create their own notebooks" ON public.notebooks;
 DROP POLICY IF EXISTS "Users can update their own notebooks" ON public.notebooks;
 DROP POLICY IF EXISTS "Users can delete their own notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Superadministrator can view all notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Superadministrator can create notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Superadministrator can update all notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Superadministrator can delete all notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Administrators can view organization notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Administrators can update organization notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Administrators can delete organization notebooks" ON public.notebooks;
+DROP POLICY IF EXISTS "Readers can view assigned notebooks" ON public.notebooks;
 
 -- Superadministrator can view all notebooks
 DROP POLICY IF EXISTS "Superadministrator can view all notebooks" ON public.notebooks;
@@ -447,9 +488,19 @@ DROP POLICY IF EXISTS "Administrators can view organization notebooks" ON public
 CREATE POLICY "Administrators can view organization notebooks"
     ON public.notebooks FOR SELECT
     USING (
-        public.is_administrator()
-        AND organization_id = public.get_user_organization_id()
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'administrator'
+            AND organization_id IS NOT NULL
+        )
         AND organization_id IS NOT NULL
+        AND organization_id = (
+            SELECT organization_id 
+            FROM public.profiles 
+            WHERE id = auth.uid()
+        )
     );
 
 -- Readers can view assigned notebooks
@@ -457,7 +508,12 @@ DROP POLICY IF EXISTS "Readers can view assigned notebooks" ON public.notebooks;
 CREATE POLICY "Readers can view assigned notebooks"
     ON public.notebooks FOR SELECT
     USING (
-        public.is_reader()
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'reader'
+        )
         AND EXISTS (
             SELECT 1 
             FROM public.notebook_assignments 
@@ -479,14 +535,31 @@ CREATE POLICY "Users can create their own notebooks"
     WITH CHECK (
         auth.uid() = user_id
         AND (
-            -- Superadministrator or regular user (no organization)
-            public.is_superadministrator()
-            OR organization_id IS NULL
+            -- Superadministrator
+            EXISTS (
+                SELECT 1 
+                FROM public.profiles 
+                WHERE id = auth.uid() 
+                AND role = 'superadministrator'
+            )
+            OR 
+            -- Regular user (no organization)
+            organization_id IS NULL
             OR
             -- Administrator creating for their organization
             (
-                public.is_administrator()
-                AND organization_id = public.get_user_organization_id()
+                EXISTS (
+                    SELECT 1 
+                    FROM public.profiles 
+                    WHERE id = auth.uid() 
+                    AND role = 'administrator'
+                    AND organization_id IS NOT NULL
+                )
+                AND organization_id = (
+                    SELECT organization_id 
+                    FROM public.profiles 
+                    WHERE id = auth.uid()
+                )
             )
         )
     );
@@ -510,14 +583,34 @@ DROP POLICY IF EXISTS "Administrators can update organization notebooks" ON publ
 CREATE POLICY "Administrators can update organization notebooks"
     ON public.notebooks FOR UPDATE
     USING (
-        public.is_administrator()
-        AND organization_id = public.get_user_organization_id()
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'administrator'
+            AND organization_id IS NOT NULL
+        )
         AND organization_id IS NOT NULL
+        AND organization_id = (
+            SELECT organization_id 
+            FROM public.profiles 
+            WHERE id = auth.uid()
+        )
     )
     WITH CHECK (
-        public.is_administrator()
-        AND organization_id = public.get_user_organization_id()
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'administrator'
+            AND organization_id IS NOT NULL
+        )
         AND organization_id IS NOT NULL
+        AND organization_id = (
+            SELECT organization_id 
+            FROM public.profiles 
+            WHERE id = auth.uid()
+        )
     );
 
 -- Superadministrator can delete all notebooks
@@ -537,9 +630,19 @@ DROP POLICY IF EXISTS "Administrators can delete organization notebooks" ON publ
 CREATE POLICY "Administrators can delete organization notebooks"
     ON public.notebooks FOR DELETE
     USING (
-        public.is_administrator()
-        AND organization_id = public.get_user_organization_id()
+        EXISTS (
+            SELECT 1 
+            FROM public.profiles 
+            WHERE id = auth.uid() 
+            AND role = 'administrator'
+            AND organization_id IS NOT NULL
+        )
         AND organization_id IS NOT NULL
+        AND organization_id = (
+            SELECT organization_id 
+            FROM public.profiles 
+            WHERE id = auth.uid()
+        )
     );
 
 -- ============================================================================
@@ -770,7 +873,29 @@ CREATE POLICY "Users can delete chat histories from accessible notebooks"
 ALTER TABLE public.organizations REPLICA IDENTITY FULL;
 ALTER TABLE public.notebook_assignments REPLICA IDENTITY FULL;
 
--- Add new tables to realtime publication
-ALTER PUBLICATION supabase_realtime ADD TABLE public.organizations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notebook_assignments;
+-- Add new tables to realtime publication (if not already added)
+DO $$
+BEGIN
+    -- Add organizations to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'organizations'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.organizations;
+    END IF;
+
+    -- Add notebook_assignments to realtime publication
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND tablename = 'notebook_assignments'
+        AND schemaname = 'public'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.notebook_assignments;
+    END IF;
+END $$;
 
