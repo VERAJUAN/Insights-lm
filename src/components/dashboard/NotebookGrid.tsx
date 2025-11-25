@@ -25,7 +25,7 @@ const NotebookGrid = () => {
     notebookCount,
     maxNotebooks
   } = useNotebooks();
-  const { isSuperadministrator } = useUserRole();
+  const { isSuperadministrator, isReader } = useUserRole();
   const navigate = useNavigate();
 
   const sortedNotebooks = useMemo(() => {
@@ -77,18 +77,29 @@ const NotebookGrid = () => {
   return <div>
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button 
-            className="bg-black hover:bg-gray-800 text-white rounded-full px-6" 
-            onClick={handleCreateNotebook} 
-            disabled={isCreating || !canCreate}
-            title={!canCreate && maxNotebooks ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
-          >
-            {isCreating ? 'Creando...' : '+ Crear nuevo'}
-          </Button>
-          {maxNotebooks && (
-            <span className="text-sm text-gray-500">
-              {notebookCount} / {maxNotebooks} cuadernos
-            </span>
+          {isReader ? (
+            <div>
+              <h2 className="text-xl font-medium text-gray-900">Tus cuadernos disponibles</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Estos son los cuadernos que han sido asignados para ti
+              </p>
+            </div>
+          ) : (
+            <>
+              <Button 
+                className="bg-black hover:bg-gray-800 text-white rounded-full px-6" 
+                onClick={handleCreateNotebook} 
+                disabled={isCreating || !canCreate}
+                title={!canCreate && maxNotebooks ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
+              >
+                {isCreating ? 'Creando...' : '+ Crear nuevo'}
+              </Button>
+              {maxNotebooks && (
+                <span className="text-sm text-gray-500">
+                  {notebookCount} / {maxNotebooks} cuadernos
+                </span>
+              )}
+            </>
           )}
         </div>
         
