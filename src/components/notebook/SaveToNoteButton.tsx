@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
 import { useNotes } from '@/hooks/useNotes';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface SaveToNoteButtonProps {
   content: string | { segments: any[]; citations: any[] };
@@ -12,6 +13,7 @@ interface SaveToNoteButtonProps {
 
 const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProps) => {
   const { createNote, isCreating } = useNotes(notebookId);
+  const { isReader } = useUserRole();
 
   const handleSaveToNote = () => {
     if (!notebookId) return;
@@ -62,7 +64,7 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
     onSaved?.();
   };
 
-  if (!notebookId) return null;
+  if (!notebookId || isReader) return null;
 
   return (
     <Button

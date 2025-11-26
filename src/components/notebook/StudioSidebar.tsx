@@ -8,6 +8,7 @@ import { useAudioOverview } from '@/hooks/useAudioOverview';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useSources } from '@/hooks/useSources';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUserRole } from '@/hooks/useUserRole';
 import NoteEditor from './NoteEditor';
 import AudioPlayer from './AudioPlayer';
 import { Citation } from '@/types/message';
@@ -54,6 +55,7 @@ const StudioSidebar = ({
     checkAudioExpiry
   } = useAudioOverview(notebookId);
   const queryClient = useQueryClient();
+  const { isReader } = useUserRole();
   const notebook = notebooks?.find(n => n.id === notebookId);
   const hasValidAudio = notebook?.audio_overview_url && !checkAudioExpiry(notebook.audio_url_expires_at);
   const currentStatus = generationStatus || notebook?.audio_overview_generation_status;
@@ -91,8 +93,14 @@ const StudioSidebar = ({
       noteId: note.id,
       sourceType: note.source_type
     });
-    setEditingNote(note);
-    setIsCreatingNote(false);
+    // Lectores solo pueden ver notas, no editarlas
+    if (isReader) {
+      setEditingNote(note);
+      setIsCreatingNote(false);
+    } else {
+      setEditingNote(note);
+      setIsCreatingNote(false);
+    }
   };
 
   const handleSaveNote = (title: string, content: string) => {
@@ -287,10 +295,12 @@ const StudioSidebar = ({
 
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar nota
-        </Button>
+        {!isReader && (
+          <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar nota
+          </Button>
+        )}
       </div>
     </div>
 
@@ -328,7 +338,9 @@ const StudioSidebar = ({
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Las notas guardadas aparecerán aquí</h3>
           <p className="text-sm text-gray-600">
-            Guarda un mensaje de chat para crear una nueva nota, o haz clic en Agregar nota arriba.
+            {isReader 
+              ? 'No hay notas guardadas en este cuaderno todavía.'
+              : 'Guarda un mensaje de chat para crear una nueva nota, o haz clic en Agregar nota arriba.'}
           </p>
         </div>}
       </div>

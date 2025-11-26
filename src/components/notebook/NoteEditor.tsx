@@ -8,6 +8,7 @@ import { Note } from '@/hooks/useNotes';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import { Citation } from '@/types/message';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface NoteEditorProps {
   note?: Note;
@@ -19,18 +20,21 @@ interface NoteEditorProps {
 }
 
 const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationClick }: NoteEditorProps) => {
+  const { isReader } = useUserRole();
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   // AI response notes should NEVER be in edit mode - they're read-only
-  const [isEditing, setIsEditing] = useState(!note || note.source_type === 'user');
+  // Lectores nunca pueden editar notas
+  const [isEditing, setIsEditing] = useState((!note || note.source_type === 'user') && !isReader);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
 
   useEffect(() => {
     setTitle(note?.title || '');
     setContent(note?.content || '');
     // AI response notes should NEVER be editable - they open in view mode
-    setIsEditing(!note || note.source_type === 'user');
-  }, [note]);
+    // Lectores nunca pueden editar notas
+    setIsEditing((!note || note.source_type === 'user') && !isReader);
+  }, [note, isReader]);
 
   const handleSave = () => {
     if (title.trim() && content.trim()) {
@@ -106,7 +110,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
               {isAIResponse ? 'Respuesta de IA' : 'Nota'}
             </h3>
             <div className="flex items-center space-x-2">
-              {!isAIResponse && (
+              {!isAIResponse && !isReader && (
                 <Button variant="ghost" size="sm" onClick={handleEdit}>
                   Editar
                 </Button>
@@ -137,7 +141,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
         <div className="p-4 border-t border-gray-200 flex-shrink-0">
           <div className="flex justify-between">
             <div>
-              {note && onDelete && (
+              {note && onDelete && !isReader && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
