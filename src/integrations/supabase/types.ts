@@ -34,20 +34,17 @@ export type Database = {
         Row: {
           id: number
           message: Json
-          session_id: string
-          user_id: string | null
+          session_id: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Insert: {
           id?: number
           message: Json
-          session_id: string
-          user_id?: string | null
+          session_id: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Update: {
           id?: number
           message?: Json
-          session_id?: string
-          user_id?: string | null
+          session_id?: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Relationships: []
       }

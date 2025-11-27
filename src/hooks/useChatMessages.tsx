@@ -177,6 +177,7 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       if (!notebookId) return [];
 
       // For public notebooks, clear history and start fresh
+      // Public notebooks use session_id = notebookId (no user_id suffix)
       if (isPublic) {
         try {
           await supabase
@@ -199,12 +200,14 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
           return [];
         }
         
-        // Fetch messages for this notebook and user
+        // Build composite session_id: notebookId_userId
+        const compositeSessionId = `${notebookId}_${user.id}`;
+        
+        // Fetch messages for this notebook and user using composite session_id
         const { data: chatHistory, error: fetchError } = await supabase
           .from('n8n_chat_histories')
           .select('*')
-          .eq('session_id', notebookId)
-          .eq('user_id', user.id)  // Filter by user_id
+          .eq('session_id', compositeSessionId)
           .order('id', { ascending: true }) as { data: any[] | null; error: any };
 
         if (fetchError) {
@@ -252,6 +255,9 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
 
     console.log('Setting up Realtime subscription for notebook:', notebookId);
 
+    // Build composite session_id for Realtime filter
+    const compositeSessionId = user?.id ? `${notebookId}_${user.id}` : notebookId;
+    
     const channel = supabase
       .channel('chat-messages')
       .on(
@@ -260,26 +266,23 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
           event: 'INSERT',
           schema: 'public',
           table: 'n8n_chat_histories',
-          filter: `session_id=eq.${notebookId}`
+          filter: `session_id=eq.${compositeSessionId}`
         },
         async (payload) => {
           console.log('Realtime: New message received:', payload);
           console.log('Realtime: Payload.new:', JSON.stringify(payload.new, null, 2));
           
           try {
-            // Only process messages for the current user (or null for public notebooks)
-            const messageUserId = (payload.new as any)?.user_id;
-            const currentUserId = user?.id;
+            // Extract user_id from composite session_id for logging
+            const messageSessionId = (payload.new as any)?.session_id;
+            const messageUserId = messageSessionId?.includes('_') 
+              ? messageSessionId.split('_')[1] 
+              : null;
             
-            // For authenticated users, only process messages with their user_id
-            // For public notebooks (isPublic = true), process messages with null user_id
-            if (!isPublic && currentUserId && messageUserId !== currentUserId) {
-              console.log('Skipping message - belongs to different user:', messageUserId, 'current user:', currentUserId);
-              return;
-            }
-            
-            if (isPublic && messageUserId !== null) {
-              console.log('Skipping message - public notebook but message has user_id:', messageUserId);
+            // The filter already ensures we only get messages for this user's session
+            // But we can still log for debugging
+            if (messageUserId && user?.id && messageUserId !== user.id) {
+              console.log('Skipping message - session_id does not match current user');
               return;
             }
             
@@ -378,21 +381,14 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
     mutationFn: async (notebookId: string) => {
       console.log('Deleting chat history for notebook:', notebookId, 'user:', user?.id);
       
-      // Delete only messages from the current user (or all if public)
-      const deleteQuery = supabase
+      // Build composite session_id for authenticated users
+      const compositeSessionId = user?.id ? `${notebookId}_${user.id}` : notebookId;
+      
+      // Delete messages using composite session_id
+      const { error } = await supabase
         .from('n8n_chat_histories')
         .delete()
-        .eq('session_id', notebookId);
-      
-      // For authenticated users, only delete their own messages
-      if (!isPublic && user?.id) {
-        deleteQuery.eq('user_id', user.id);
-      } else if (isPublic) {
-        // For public notebooks, delete messages with null user_id
-        deleteQuery.is('user_id', null);
-      }
-      
-      const { error } = await deleteQuery;
+        .eq('session_id', compositeSessionId);
 
       if (error) {
         console.error('Error deleting chat history:', error);

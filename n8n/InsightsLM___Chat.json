@@ -48,7 +48,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $json.body.session_id }}",
+        "sessionKey": "={{ $json.body.user_id ? $json.body.session_id + '_' + $json.body.user_id : $json.body.session_id }}",
         "contextWindowLength": 20
       },
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
