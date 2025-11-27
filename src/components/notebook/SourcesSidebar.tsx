@@ -230,22 +230,87 @@ const SourcesSidebar = ({
     );
   }
 
-  // For readers and public users, hide the sources sidebar completely
-  if (isReadOnly) {
+  // For readers, completely hide the sources sidebar
+  if (isReader) {
+    return null;
+  }
+
+  // For public users, show sources in read-only mode
+  if (isPublic) {
+    if (isLoading) {
+      return (
+        <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-8">
+            <p className="text-sm text-gray-600">Cargando fuentes...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!sources || sources.length === 0) {
+      return (
+        <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
+            <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-sm text-gray-500">
+                No hay fuentes en este cuaderno.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Show sources in read-only mode for public users
     return (
       <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
+          <p className="text-xs text-gray-500 mt-1">Solo lectura</p>
         </div>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <p className="text-sm text-gray-500">
-              {isPublic 
-                ? 'Este es un cuaderno público. Solo puedes chatear con él. No puedes ver ni gestionar las fuentes.'
-                : 'Como lector, solo puedes chatear con este cuaderno. No puedes ver ni gestionar las fuentes.'}
-            </p>
+        <ScrollArea className="flex-1 h-full">
+          <div className="p-4">
+            <div className="space-y-3">
+              {sources.map((source: any) => (
+                <Card 
+                  key={source.id} 
+                  className="p-3 border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setSelectedSourceForViewing(source);
+                    if (setSelectedCitation) {
+                      setSelectedCitation({
+                        citation_id: -1,
+                        source_id: source.id,
+                        source_title: source.title,
+                        source_type: source.type,
+                        chunk_index: 0,
+                        excerpt: 'Full document view'
+                      });
+                    }
+                  }}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 mt-1 w-6 h-6">
+                      {renderSourceIcon(source.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate">{source.title}</h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {source.type}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </div>
     );
   }

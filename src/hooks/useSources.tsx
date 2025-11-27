@@ -21,9 +21,7 @@ export const useSources = (notebookId?: string) => {
     queryFn: async () => {
       if (!notebookId) return [];
       
-      // Readers cannot access sources
-      if (isReader) return [];
-      
+      // Readers can view sources (read-only), but cannot manage them
       const { data, error } = await supabase
         .from('sources')
         .select('*')
@@ -33,10 +31,10 @@ export const useSources = (notebookId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!notebookId && !isReader, // Public notebooks can fetch sources (read-only)
+    enabled: !!notebookId, // All users can fetch sources (read-only for readers)
   });
 
-  // Set up Realtime subscription for sources table
+  // Set up Realtime subscription for sources table (only for non-readers)
   useEffect(() => {
     if (!notebookId || !user || isReader) return;
 

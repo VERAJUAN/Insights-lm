@@ -218,41 +218,69 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         },
         async (payload) => {
           console.log('Realtime: New message received:', payload);
+          console.log('Realtime: Payload.new:', JSON.stringify(payload.new, null, 2));
           
-          // Fetch sources for proper transformation
-          const { data: sourcesData } = await supabase
-            .from('sources')
-            .select('id, title, type')
-            .eq('notebook_id', notebookId);
-          
-          const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-          
-          // Transform the new message
-          const newMessage = transformMessage(payload.new, sourceMap);
-          
-          // Update the query cache with the new message
-          queryClient.setQueryData(['chat-messages', notebookId], (oldMessages: EnhancedChatMessage[] = []) => {
-            // Check if message already exists to prevent duplicates
-            const messageExists = oldMessages.some(msg => msg.id === newMessage.id);
-            if (messageExists) {
-              console.log('Message already exists, skipping:', newMessage.id);
-              return oldMessages;
+          try {
+            // Fetch sources for proper transformation
+            const { data: sourcesData, error: sourcesError } = await supabase
+              .from('sources')
+              .select('id, title, type')
+              .eq('notebook_id', notebookId);
+            
+            if (sourcesError) {
+              console.error('Error fetching sources for message transformation:', sourcesError);
             }
             
-            console.log('Adding new message to cache:', newMessage);
-            return [...oldMessages, newMessage];
-          });
+            const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
+            console.log('Source map:', Array.from(sourceMap.entries()));
+            
+            // Transform the new message
+            const newMessage = transformMessage(payload.new, sourceMap);
+            console.log('Transformed message:', JSON.stringify(newMessage, null, 2));
+            
+            // Update the query cache with the new message
+            queryClient.setQueryData(['chat-messages', notebookId, isPublic], (oldMessages: EnhancedChatMessage[] = []) => {
+              // Check if message already exists to prevent duplicates
+              const messageExists = oldMessages.some(msg => msg.id === newMessage.id);
+              if (messageExists) {
+                console.log('Message already exists, skipping:', newMessage.id);
+                return oldMessages;
+              }
+              
+              console.log('Adding new message to cache. Total messages:', oldMessages.length + 1);
+              return [...oldMessages, newMessage];
+            });
+          } catch (error) {
+            console.error('Error processing realtime message:', error);
+            console.error('Error details:', {
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              payload: payload.new
+            });
+          }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('Realtime subscription status:', status);
+        if (err) {
+          console.error('Realtime subscription error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to chat messages for notebook:', notebookId);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Channel error in Realtime subscription');
+        } else if (status === 'TIMED_OUT') {
+          console.error('Realtime subscription timed out');
+        } else if (status === 'CLOSED') {
+          console.warn('Realtime subscription closed');
+        }
       });
 
     return () => {
       console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [notebookId, queryClient]);
+  }, [notebookId, isPublic, queryClient]);
 
   const sendMessage = useMutation({
     mutationFn: async (messageData: {

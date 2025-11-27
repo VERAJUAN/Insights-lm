@@ -51,13 +51,22 @@ const ChatArea = ({
     isDeletingChatHistory
   } = useChatMessages(notebookId, isPublic);
   
-  const { isReader } = useUserRole();
+  const { isReader, isLoading: isLoadingRole } = useUserRole();
   const isReadOnly = isReader || isPublic;
   const {
     sources
   } = useSources(notebookId);
   
   const sourceCount = sources?.length || 0;
+
+  // For readers, show content if notebook exists (even without sources)
+  // For other users, require sources
+  // Don't show empty state while loading role to prevent button flash
+  const shouldShowContent = isLoadingRole
+    ? !!notebook // While loading, show content if notebook exists (prevents empty state flash)
+    : (isReadOnly 
+      ? !!notebook // Readers can see content if notebook exists
+      : hasSource); // Other users need sources
 
   // Check if at least one source has been successfully processed
   // For readers and public users, assume sources are processed if they have access to the notebook
@@ -76,12 +85,22 @@ const ChatArea = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // If we have new messages and we have a pending message, clear it
-    if (messages.length > lastMessageCount && pendingUserMessage) {
-      setPendingUserMessage(null);
-      setShowAiLoading(false);
+    if (messages.length > lastMessageCount) {
+      // Check if the last message is from AI (which means the response arrived)
+      const lastMessage = messages[messages.length - 1];
+      const isAiMessage = lastMessage?.message?.type === 'ai' || lastMessage?.message?.role === 'assistant';
+      
+      if (pendingUserMessage && isAiMessage) {
+        console.log('AI response received, clearing loading state');
+        setPendingUserMessage(null);
+        setShowAiLoading(false);
+      } else if (pendingUserMessage && messages.length > lastMessageCount) {
+        // If we have more messages but no AI response yet, keep waiting
+        console.log('More messages received, but waiting for AI response');
+      }
     }
     setLastMessageCount(messages.length);
-  }, [messages.length, lastMessageCount, pendingUserMessage]);
+  }, [messages, lastMessageCount, pendingUserMessage]);
 
   // Auto-scroll when pending message is set, when messages update, or when AI loading appears
   useEffect(() => {
@@ -178,7 +197,7 @@ const ChatArea = ({
     return "Comienza a escribir...";
   };
   return <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {hasSource ? <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {shouldShowContent ? <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Chat Header */}
           <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -202,7 +221,7 @@ const ChatArea = ({
                     <h1 className="text-2xl font-medium text-gray-900">
                       {isGenerating ? 'Generando contenido...' : notebook?.title || 'Cuaderno sin título'}
                     </h1>
-                    <p className="text-sm text-gray-600">{sourceCount} fuente{sourceCount !== 1 ? 's' : ''}</p>
+                    {!isReader && <p className="text-sm text-gray-600">{sourceCount} fuente{sourceCount !== 1 ? 's' : ''}</p>}
                   </div>
                 </div>
                 
@@ -258,10 +277,12 @@ const ChatArea = ({
             <div className="max-w-4xl mx-auto">
               <div className="flex space-x-4">
                 <div className="flex-1 relative">
-                  <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className="pr-12" disabled={isChatDisabled || isSending || !!pendingUserMessage} />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                    {sourceCount} fuente{sourceCount !== 1 ? 's' : ''}
-                  </div>
+                  <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className={isReader ? "" : "pr-12"} disabled={isChatDisabled || isSending || !!pendingUserMessage} />
+                  {!isReader && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                      {sourceCount} fuente{sourceCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
                 <Button onClick={() => handleSendMessage()} disabled={!message.trim() || isChatDisabled || isSending || !!pendingUserMessage}>
                   {isSending || pendingUserMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -296,7 +317,7 @@ const ChatArea = ({
             <h2 className="text-xl font-medium text-gray-900 mb-4">
               {isReadOnly ? 'Chat con el cuaderno' : 'Agrega una fuente para comenzar'}
             </h2>
-            {!isReadOnly && (
+            {!isReadOnly && !isLoadingRole && (
               <Button onClick={() => setShowAddSourcesDialog(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Subir una fuente
