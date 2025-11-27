@@ -190,16 +190,22 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         return [];
       }
 
-      // For authenticated users, load existing chat history
+      // For authenticated users, load existing chat history filtered by user
       try {
-        console.log('Loading chat history for notebook:', notebookId);
+        console.log('Loading chat history for notebook:', notebookId, 'user:', user?.id);
         
-        // Fetch all messages for this notebook
+        if (!user?.id) {
+          console.log('No user ID, returning empty history');
+          return [];
+        }
+        
+        // Fetch messages for this notebook and user
         const { data: chatHistory, error: fetchError } = await supabase
           .from('n8n_chat_histories')
           .select('*')
           .eq('session_id', notebookId)
-          .order('id', { ascending: true });
+          .eq('user_id', user.id)  // Filter by user_id
+          .order('id', { ascending: true }) as { data: any[] | null; error: any };
 
         if (fetchError) {
           console.error('Error fetching chat history:', fetchError);
@@ -222,9 +228,9 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         }
 
         const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-        console.log('Loaded', chatHistory.length, 'messages from history');
+        console.log('Loaded', chatHistory.length, 'messages from history for user:', user.id);
 
-        // Transform all messages
+        // Transform all messages (already filtered by user_id)
         const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
         
         console.log('Transformed', transformedMessages.length, 'messages');
@@ -261,6 +267,22 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
           console.log('Realtime: Payload.new:', JSON.stringify(payload.new, null, 2));
           
           try {
+            // Only process messages for the current user (or null for public notebooks)
+            const messageUserId = (payload.new as any)?.user_id;
+            const currentUserId = user?.id;
+            
+            // For authenticated users, only process messages with their user_id
+            // For public notebooks (isPublic = true), process messages with null user_id
+            if (!isPublic && currentUserId && messageUserId !== currentUserId) {
+              console.log('Skipping message - belongs to different user:', messageUserId, 'current user:', currentUserId);
+              return;
+            }
+            
+            if (isPublic && messageUserId !== null) {
+              console.log('Skipping message - public notebook but message has user_id:', messageUserId);
+              return;
+            }
+            
             // Fetch sources for proper transformation
             const { data: sourcesData, error: sourcesError } = await supabase
               .from('sources')
@@ -320,7 +342,7 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [notebookId, isPublic, queryClient]);
+  }, [notebookId, isPublic, user?.id, queryClient]);
 
   const sendMessage = useMutation({
     mutationFn: async (messageData: {
@@ -354,12 +376,23 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
 
   const deleteChatHistory = useMutation({
     mutationFn: async (notebookId: string) => {
-      console.log('Deleting chat history for notebook:', notebookId);
+      console.log('Deleting chat history for notebook:', notebookId, 'user:', user?.id);
       
-      const { error } = await supabase
+      // Delete only messages from the current user (or all if public)
+      const deleteQuery = supabase
         .from('n8n_chat_histories')
         .delete()
         .eq('session_id', notebookId);
+      
+      // For authenticated users, only delete their own messages
+      if (!isPublic && user?.id) {
+        deleteQuery.eq('user_id', user.id);
+      } else if (isPublic) {
+        // For public notebooks, delete messages with null user_id
+        deleteQuery.is('user_id', null);
+      }
+      
+      const { error } = await deleteQuery;
 
       if (error) {
         console.error('Error deleting chat history:', error);

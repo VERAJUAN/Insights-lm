@@ -35,16 +35,19 @@ export type Database = {
           id: number
           message: Json
           session_id: string
+          user_id: string | null
         }
         Insert: {
           id?: number
           message: Json
           session_id: string
+          user_id?: string | null
         }
         Update: {
           id?: number
           message?: Json
           session_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
