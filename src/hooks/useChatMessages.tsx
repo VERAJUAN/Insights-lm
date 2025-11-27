@@ -166,8 +166,7 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Always start with empty messages - don't load chat history
-  // Chat history is not persisted between sessions
+  // Load chat history for authenticated users, start fresh for public notebooks
   const {
     data: messages = [],
     isLoading,
@@ -176,27 +175,68 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
     queryKey: ['chat-messages', notebookId, isPublic],
     queryFn: async () => {
       if (!notebookId) return [];
-      
-      // Delete any existing chat history when opening a notebook
-      // This ensures chats always start from zero
-      // Works for both authenticated users and public notebooks
-      try {
-        await supabase
-          .from('n8n_chat_histories')
-          .delete()
-          .eq('session_id', notebookId);
-        console.log('Cleared existing chat history for notebook:', notebookId);
-      } catch (deleteError) {
-        console.error('Error clearing chat history:', deleteError);
-        // Continue even if deletion fails
+
+      // For public notebooks, clear history and start fresh
+      if (isPublic) {
+        try {
+          await supabase
+            .from('n8n_chat_histories')
+            .delete()
+            .eq('session_id', notebookId);
+          console.log('Cleared existing chat history for public notebook:', notebookId);
+        } catch (deleteError) {
+          console.error('Error clearing chat history:', deleteError);
+        }
+        return [];
       }
-      
-      // Always return empty array - chats start fresh
-      return [];
+
+      // For authenticated users, load existing chat history
+      try {
+        console.log('Loading chat history for notebook:', notebookId);
+        
+        // Fetch all messages for this notebook
+        const { data: chatHistory, error: fetchError } = await supabase
+          .from('n8n_chat_histories')
+          .select('*')
+          .eq('session_id', notebookId)
+          .order('id', { ascending: true });
+
+        if (fetchError) {
+          console.error('Error fetching chat history:', fetchError);
+          return [];
+        }
+
+        if (!chatHistory || chatHistory.length === 0) {
+          console.log('No chat history found for notebook:', notebookId);
+          return [];
+        }
+
+        // Fetch sources for proper transformation
+        const { data: sourcesData, error: sourcesError } = await supabase
+          .from('sources')
+          .select('id, title, type')
+          .eq('notebook_id', notebookId);
+
+        if (sourcesError) {
+          console.error('Error fetching sources for message transformation:', sourcesError);
+        }
+
+        const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
+        console.log('Loaded', chatHistory.length, 'messages from history');
+
+        // Transform all messages
+        const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
+        
+        console.log('Transformed', transformedMessages.length, 'messages');
+        return transformedMessages;
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+        return [];
+      }
     },
-    enabled: !!notebookId, // Enable for both authenticated and public notebooks
+    enabled: !!notebookId,
     refetchOnMount: true,
-    refetchOnReconnect: false, // Don't refetch on reconnect to avoid clearing again
+    refetchOnReconnect: false,
   });
 
   // Set up Realtime subscription for new messages
