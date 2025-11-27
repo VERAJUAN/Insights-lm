@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { EnhancedChatMessage, Citation, MessageSegment } from '@/types/message';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import { useBrowserId, getBrowserId } from '@/hooks/useBrowserId';
 
 // Type for the expected message structure from n8n_chat_histories
 interface N8nMessageFormat {
@@ -163,6 +164,7 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
 
 export const useChatMessages = (notebookId?: string, isPublic: boolean = false) => {
   const { user } = useAuth();
+  const browserId = useBrowserId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -176,19 +178,102 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
     queryFn: async () => {
       if (!notebookId) return [];
 
-      // For public notebooks, clear history and start fresh
-      // Public notebooks use session_id = notebookId (no user_id suffix)
+      // For public notebooks: use browser_id if not logged in, user_id if logged in
       if (isPublic) {
-        try {
-          await supabase
-            .from('n8n_chat_histories')
-            .delete()
-            .eq('session_id', notebookId);
-          console.log('Cleared existing chat history for public notebook:', notebookId);
-        } catch (deleteError) {
-          console.error('Error clearing chat history:', deleteError);
+        // If user is logged in, use their user_id (not browser_id)
+        if (user?.id) {
+          const compositeSessionId = `${notebookId}_${user.id}`;
+          console.log('Loading chat history for public notebook (logged in):', notebookId, 'user:', user.id);
+          
+          try {
+            const { data: chatHistory, error: fetchError } = await supabase
+              .from('n8n_chat_histories')
+              .select('*')
+              .eq('session_id', compositeSessionId)
+              .order('id', { ascending: true }) as { data: any[] | null; error: any };
+
+            if (fetchError) {
+              console.error('Error fetching chat history:', fetchError);
+              return [];
+            }
+
+            if (!chatHistory || chatHistory.length === 0) {
+              console.log('No chat history found for public notebook (logged in):', notebookId);
+              return [];
+            }
+
+            const { data: sourcesData, error: sourcesError } = await supabase
+              .from('sources')
+              .select('id, title, type')
+              .eq('notebook_id', notebookId);
+
+            if (sourcesError) {
+              console.error('Error fetching sources for message transformation:', sourcesError);
+            }
+
+            const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
+            console.log('Loaded', chatHistory.length, 'messages from history for user:', user.id);
+
+            const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
+            console.log('Transformed', transformedMessages.length, 'messages');
+            return transformedMessages;
+          } catch (error) {
+            console.error('Error loading chat history:', error);
+            return [];
+          }
         }
-        return [];
+        
+        // If not logged in, use browser_id
+        if (!browserId) {
+          console.log('No browser ID yet, returning empty history');
+          return [];
+        }
+        
+        // Build composite session_id: notebookId_guest_browserId
+        const compositeSessionId = `${notebookId}_${browserId}`;
+        
+        console.log('Loading chat history for public notebook:', notebookId, 'browser:', browserId);
+        
+        try {
+          // Fetch messages for this notebook and browser using composite session_id
+          const { data: chatHistory, error: fetchError } = await supabase
+            .from('n8n_chat_histories')
+            .select('*')
+            .eq('session_id', compositeSessionId)
+            .order('id', { ascending: true }) as { data: any[] | null; error: any };
+
+          if (fetchError) {
+            console.error('Error fetching chat history:', fetchError);
+            return [];
+          }
+
+          if (!chatHistory || chatHistory.length === 0) {
+            console.log('No chat history found for public notebook:', notebookId);
+            return [];
+          }
+
+          // Fetch sources for proper transformation
+          const { data: sourcesData, error: sourcesError } = await supabase
+            .from('sources')
+            .select('id, title, type')
+            .eq('notebook_id', notebookId);
+
+          if (sourcesError) {
+            console.error('Error fetching sources for message transformation:', sourcesError);
+          }
+
+          const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
+          console.log('Loaded', chatHistory.length, 'messages from history for browser:', browserId);
+
+          // Transform all messages
+          const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
+          
+          console.log('Transformed', transformedMessages.length, 'messages');
+          return transformedMessages;
+        } catch (error) {
+          console.error('Error loading chat history:', error);
+          return [];
+        }
       }
 
       // For authenticated users, load existing chat history filtered by user
@@ -256,7 +341,12 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
     console.log('Setting up Realtime subscription for notebook:', notebookId);
 
     // Build composite session_id for Realtime filter
-    const compositeSessionId = user?.id ? `${notebookId}_${user.id}` : notebookId;
+    // Priority: user_id (if logged in) > browser_id (if public and not logged in) > notebookId only
+    const compositeSessionId = user?.id
+      ? `${notebookId}_${user.id}`
+      : (isPublic && browserId)
+        ? `${notebookId}_${browserId}`
+        : notebookId;
     
     const channel = supabase
       .channel('chat-messages')
@@ -345,7 +435,7 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [notebookId, isPublic, user?.id, queryClient]);
+  }, [notebookId, isPublic, user?.id, browserId, queryClient]);
 
   const sendMessage = useMutation({
     mutationFn: async (messageData: {
@@ -353,8 +443,11 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       role: 'user' | 'assistant';
       content: string;
     }) => {
-      // For public notebooks, user_id can be null
-      const userId = user?.id || null;
+      // Determine user_id:
+      // - If user is logged in: use user_id (works for both private and public notebooks)
+      // - If public notebook without user: use browser_id
+      // - Otherwise: null
+      const userId = user?.id || (isPublic && !user?.id ? getBrowserId() : null);
 
       // Call the n8n webhook
       const webhookResponse = await supabase.functions.invoke('send-chat-message', {
@@ -379,10 +472,15 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
 
   const deleteChatHistory = useMutation({
     mutationFn: async (notebookId: string) => {
-      console.log('Deleting chat history for notebook:', notebookId, 'user:', user?.id);
+      console.log('Deleting chat history for notebook:', notebookId, 'user:', user?.id, 'browser:', browserId);
       
-      // Build composite session_id for authenticated users
-      const compositeSessionId = user?.id ? `${notebookId}_${user.id}` : notebookId;
+      // Build composite session_id
+      // Priority: user_id (if logged in) > browser_id (if public and not logged in) > notebookId only
+      const compositeSessionId = user?.id
+        ? `${notebookId}_${user.id}`
+        : (isPublic && browserId)
+          ? `${notebookId}_${browserId}`
+          : notebookId;
       
       // Delete messages using composite session_id
       const { error } = await supabase
