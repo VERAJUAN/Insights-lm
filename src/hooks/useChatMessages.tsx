@@ -14,7 +14,6 @@ const saveToLocalStorage = (notebookId: string, messages: EnhancedChatMessage[])
   try {
     const key = getLocalStorageKey(notebookId);
     localStorage.setItem(key, JSON.stringify(messages));
-    console.log('Saved', messages.length, 'messages to localStorage for public notebook:', notebookId);
   } catch (error) {
     console.error('Error saving to localStorage:', error);
   }
@@ -26,7 +25,6 @@ const loadFromLocalStorage = (notebookId: string): EnhancedChatMessage[] => {
     const data = localStorage.getItem(key);
     if (data) {
       const messages = JSON.parse(data) as EnhancedChatMessage[];
-      console.log('Loaded', messages.length, 'messages from localStorage for public notebook:', notebookId);
       return messages;
     }
   } catch (error) {
@@ -39,7 +37,6 @@ const clearLocalStorage = (notebookId: string) => {
   try {
     const key = getLocalStorageKey(notebookId);
     localStorage.removeItem(key);
-    console.log('Cleared localStorage for public notebook:', notebookId);
   } catch (error) {
     console.error('Error clearing localStorage:', error);
   }
@@ -80,8 +77,6 @@ interface N8nAiResponseContent {
 }
 
 const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatMessage => {
-  console.log('Processing item:', JSON.stringify(item, null, 2));
-  
   // Handle the message format based on your JSON examples
   let transformedMessage: EnhancedChatMessage['message'];
   
@@ -155,7 +150,6 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
           };
         }
       } catch (parseError) {
-        console.log('Failed to parse AI content as JSON, treating as plain text:', parseError);
         // If parsing fails, treat as regular string content
         transformedMessage = {
           type: 'ai',
@@ -205,8 +199,6 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
     };
   }
 
-  console.log('Transformed message:', transformedMessage);
-
   return {
     id: item.id,
     session_id: item.session_id,
@@ -235,7 +227,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         // If user is logged in, use database (same as private notebooks)
         if (user?.id) {
           const compositeSessionId = `${notebookId}_${user.id}`;
-          console.log('Loading chat history for public notebook (logged in):', notebookId, 'user:', user.id);
           
           try {
             const { data: chatHistory, error: fetchError } = await supabase
@@ -250,7 +241,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             }
 
             if (!chatHistory || chatHistory.length === 0) {
-              console.log('No chat history found for public notebook (logged in):', notebookId);
               return [];
             }
 
@@ -264,10 +254,8 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             }
 
             const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-            console.log('Loaded', chatHistory.length, 'messages from history for user:', user.id);
 
             const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
-            console.log('Transformed', transformedMessages.length, 'messages');
             return transformedMessages;
           } catch (error) {
             console.error('Error loading chat history:', error);
@@ -276,16 +264,12 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         }
         
         // If not logged in, use localStorage (no database queries)
-        console.log('Loading chat history from localStorage for anonymous public user:', notebookId);
         return loadFromLocalStorage(notebookId);
       }
 
       // For authenticated users, load existing chat history filtered by user
       try {
-        console.log('Loading chat history for notebook:', notebookId, 'user:', user?.id);
-        
         if (!user?.id) {
-          console.log('No user ID, returning empty history');
           return [];
         }
         
@@ -305,7 +289,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         }
 
         if (!chatHistory || chatHistory.length === 0) {
-          console.log('No chat history found for notebook:', notebookId);
           return [];
         }
 
@@ -320,12 +303,10 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         }
 
         const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-        console.log('Loaded', chatHistory.length, 'messages from history for user:', user.id);
 
         // Transform all messages (already filtered by user_id)
         const transformedMessages = chatHistory.map(item => transformMessage(item, sourceMap));
         
-        console.log('Transformed', transformedMessages.length, 'messages');
         return transformedMessages;
       } catch (error) {
         console.error('Error loading chat history:', error);
@@ -341,8 +322,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
   // For anonymous users, we still listen to Realtime but save to localStorage instead of DB
   useEffect(() => {
     if (!notebookId) return;
-
-    console.log('Setting up Realtime subscription for notebook:', notebookId, 'isPublic:', isPublic, 'user:', user?.id);
 
     // Build composite session_id for Realtime filter
     // For anonymous users, listen to messages with session_id = notebookId (n8n still saves them)
@@ -362,9 +341,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
           filter: `session_id=eq.${compositeSessionId}`
         },
         async (payload) => {
-          console.log('Realtime: New message received:', payload);
-          console.log('Realtime: Payload.new:', JSON.stringify(payload.new, null, 2));
-          
           try {
             // Fetch sources for proper transformation (needed for all messages)
             const { data: sourcesData, error: sourcesError } = await supabase
@@ -377,11 +353,9 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             }
             
             const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-            console.log('Source map:', Array.from(sourceMap.entries()));
             
             // Transform the new message
             const newMessage = transformMessage(payload.new, sourceMap);
-            console.log('Transformed message:', JSON.stringify(newMessage, null, 2));
             
             // Filter out system messages like "Workflow was started"
             const systemMessages = ['Workflow was started', 'workflow was started'];
@@ -395,7 +369,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
               : JSON.stringify(newMessage.message.content);
             
             if (isSystemMessage(messageContent)) {
-              console.log('Skipping system message from Realtime:', messageContent);
               return;
             }
             
@@ -405,7 +378,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
               const messageSessionId = (payload.new as any)?.session_id;
               // Only process if session_id matches notebookId exactly (not with user_id)
               if (messageSessionId !== notebookId) {
-                console.log('Skipping message - session_id does not match for anonymous user:', messageSessionId, 'expected:', notebookId);
                 return;
               }
             }
@@ -416,7 +388,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
               const messageExists = oldMessages.some(msg => {
                 // Check by ID first
                 if (msg.id === newMessage.id) {
-                  console.log('Duplicate detected by ID:', newMessage.id);
                   return true;
                 }
                 
@@ -432,7 +403,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
                     
                     // If one is temp and the other is not, they're the same message
                     if (msgIsTemp !== newMsgIsTemp) {
-                      console.log('Duplicate detected: temp message and real message with same content');
                       return true;
                     }
                     
@@ -441,7 +411,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
                       const timeDiff = Math.abs((msg.id as number) - (newMessage.id as number));
                       // If same content and within 5 seconds, consider it duplicate
                       if (timeDiff < 5000) {
-                        console.log('Duplicate detected: same content within 5 seconds');
                         return true;
                       }
                     }
@@ -452,7 +421,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
               });
               
               if (messageExists) {
-                console.log('Message already exists, skipping:', newMessage.id);
                 return oldMessages;
               }
               
@@ -467,7 +435,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
                 );
                 
                 if (tempMessageIndex !== -1) {
-                  console.log('Replacing temporary message with real one from DB');
                   const updatedMessages = [...oldMessages];
                   updatedMessages[tempMessageIndex] = newMessage;
                   saveToLocalStorage(notebookId, updatedMessages);
@@ -476,7 +443,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
               }
               
               const updatedMessages = [...oldMessages, newMessage];
-              console.log('Adding new message to cache. Total messages:', updatedMessages.length);
               
               // For anonymous users, save to localStorage
               if (isPublic && !user?.id) {
@@ -496,13 +462,10 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         }
       )
       .subscribe((status, err) => {
-        console.log('Realtime subscription status:', status);
         if (err) {
           console.error('Realtime subscription error:', err);
         }
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to chat messages for notebook:', notebookId);
-        } else if (status === 'CHANNEL_ERROR') {
+        if (status === 'CHANNEL_ERROR') {
           console.error('Channel error in Realtime subscription');
         } else if (status === 'TIMED_OUT') {
           console.error('Realtime subscription timed out');
@@ -512,7 +475,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       });
 
     return () => {
-      console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [notebookId, isPublic, user?.id, queryClient]);
@@ -565,20 +527,12 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         throw new Error(`Webhook error: ${webhookResponse.error.message}`);
       }
 
-      console.log('Full webhookResponse:', JSON.stringify(webhookResponse, null, 2));
-      console.log('webhookResponse.data:', webhookResponse.data);
-      console.log('webhookResponse.data type:', typeof webhookResponse.data);
-
       // For anonymous users using In-Memory Chat Memory, process the response directly from webhook
       // (no Realtime events will be triggered since nothing is saved to DB)
       if (isPublic && !user?.id) {
-        console.log('Processing webhook response for anonymous user. Data exists:', !!webhookResponse.data);
-        console.log('Full webhookResponse.data:', JSON.stringify(webhookResponse.data, null, 2));
-        
         // The webhook response structure: { success: true, data: { ... } }
         // n8n returns the AI agent response in webhookResponse.data.data
         const webhookData = webhookResponse.data.data || webhookResponse.data;
-        console.log('Extracted webhookData:', JSON.stringify(webhookData, null, 2));
         
         // Filter out system messages like "Workflow was started"
         const systemMessages = ['Workflow was started', 'workflow was started'];
@@ -659,7 +613,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             // We need to convert it to the format that transformMessage expects
             // transformMessage expects: { type: 'ai', content: JSON.stringify({ output: [...] }) }
             const jsonContent = JSON.stringify({ output: data.output });
-            console.log('Converting output array to JSON string:', jsonContent);
             return { 
               type: 'ai', 
               content: jsonContent
@@ -711,7 +664,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         
         // Extract the AI message from the webhook data
         const extractedMessage = extractAiResponse(webhookData);
-        console.log('Extracted message:', JSON.stringify(extractedMessage, null, 2));
         
         // Check if it's a system message
         const messageContent = typeof extractedMessage === 'object' && extractedMessage.content
@@ -719,7 +671,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
           : (typeof extractedMessage === 'string' ? extractedMessage : JSON.stringify(extractedMessage));
         
         if (isSystemMessage(messageContent)) {
-          console.log('Skipping system message:', messageContent);
           return webhookResponse.data;
         }
         
@@ -735,12 +686,10 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             } else if (Array.isArray(extractedMessage.content)) {
               // If content is an array, wrap it in { output: [...] } format
               contentToUse = JSON.stringify({ output: extractedMessage.content });
-              console.log('Content was array, converted to JSON string:', contentToUse);
             } else {
               contentToUse = JSON.stringify(extractedMessage.content);
             }
             
-            console.log('Using contentToUse for transformMessage:', contentToUse);
             aiResponse = transformMessage({ 
               id: Date.now() + 1, 
               session_id: messageData.notebookId,
@@ -790,7 +739,6 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
             ? aiResponse.message.content 
             : JSON.stringify(aiResponse.message.content);
           if (isSystemMessage(finalContent)) {
-            console.log('Skipping system message after transformation:', finalContent);
             aiResponse = null;
           }
         } catch (error) {
@@ -809,11 +757,9 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         
         // Save to localStorage and update cache if we have a valid response
         if (aiResponse) {
-          console.log('Saving AI response to localStorage:', aiResponse);
           queryClient.setQueryData(['chat-messages', notebookId, isPublic], (oldMessages: EnhancedChatMessage[] = []) => {
             const updatedMessages = [...oldMessages, aiResponse!];
             saveToLocalStorage(messageData.notebookId, updatedMessages);
-            console.log('Saved AI response to localStorage for anonymous user. Total messages:', updatedMessages.length);
             return updatedMessages;
           });
         } else {
@@ -844,14 +790,11 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
     onSuccess: () => {
       // For authenticated users, the response will appear via Realtime
       // For anonymous users, we handle it manually
-      console.log('Message sent to webhook successfully');
     },
   });
 
   const deleteChatHistory = useMutation({
     mutationFn: async (notebookId: string) => {
-      console.log('Deleting chat history for notebook:', notebookId, 'user:', user?.id);
-      
       // For anonymous public users, clear localStorage
       if (isPublic && !user?.id) {
         clearLocalStorage(notebookId);
@@ -874,14 +817,12 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
         throw error;
       }
       
-      console.log('Chat history deleted successfully');
       return notebookId;
     },
     onSuccess: (notebookId) => {
-      console.log('Chat history cleared for notebook:', notebookId);
       toast({
-        title: "Chat history cleared",
-        description: "All messages have been deleted successfully.",
+        title: "Historial de chat borrado",
+        description: "Todos los mensajes han sido borrados correctamente.",
       });
       
       // Clear the query data and refetch to confirm
@@ -894,7 +835,7 @@ export const useChatMessages = (notebookId?: string, isPublic: boolean = false) 
       console.error('Failed to delete chat history:', error);
       toast({
         title: "Error",
-        description: "Failed to clear chat history. Please try again.",
+        description: "No se pudo borrar el historial de chat. Por favor, inténtelo de nuevo.",
         variant: "destructive",
       });
     }
