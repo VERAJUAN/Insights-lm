@@ -17,24 +17,26 @@ interface NoteEditorProps {
   onCancel: () => void;
   isLoading?: boolean;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
-const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationClick }: NoteEditorProps) => {
+const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationClick, isPublic = false }: NoteEditorProps) => {
   const { isReader } = useUserRole();
+  const isReadOnly = isReader || isPublic;
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   // AI response notes should NEVER be in edit mode - they're read-only
-  // Lectores nunca pueden editar notas
-  const [isEditing, setIsEditing] = useState((!note || note.source_type === 'user') && !isReader);
+  // Lectores y usuarios públicos nunca pueden editar notas
+  const [isEditing, setIsEditing] = useState((!note || note.source_type === 'user') && !isReadOnly);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
 
   useEffect(() => {
     setTitle(note?.title || '');
     setContent(note?.content || '');
     // AI response notes should NEVER be editable - they open in view mode
-    // Lectores nunca pueden editar notas
-    setIsEditing((!note || note.source_type === 'user') && !isReader);
-  }, [note, isReader]);
+    // Lectores y usuarios públicos nunca pueden editar notas
+    setIsEditing((!note || note.source_type === 'user') && !isReadOnly);
+  }, [note, isReadOnly]);
 
   const handleSave = () => {
     if (title.trim() && content.trim()) {
@@ -110,7 +112,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
               {isAIResponse ? 'Respuesta de IA' : 'Nota'}
             </h3>
             <div className="flex items-center space-x-2">
-              {!isAIResponse && !isReader && (
+              {!isAIResponse && !isReadOnly && (
                 <Button variant="ghost" size="sm" onClick={handleEdit}>
                   Editar
                 </Button>
@@ -141,7 +143,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
         <div className="p-4 border-t border-gray-200 flex-shrink-0">
           <div className="flex justify-between">
             <div>
-              {note && onDelete && !isReader && (
+              {note && onDelete && !isReadOnly && (
                 <Button 
                   variant="ghost" 
                   size="sm" 

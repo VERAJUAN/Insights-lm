@@ -14,12 +14,12 @@ export interface Note {
   updated_at: string;
 }
 
-export const useNotes = (notebookId?: string) => {
+export const useNotes = (notebookId?: string, isPublic: boolean = false) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: notes, isLoading } = useQuery({
-    queryKey: ['notes', notebookId],
+    queryKey: ['notes', notebookId, isPublic],
     queryFn: async () => {
       if (!notebookId) return [];
       
@@ -32,7 +32,8 @@ export const useNotes = (notebookId?: string) => {
       if (error) throw error;
       return data as Note[];
     },
-    enabled: !!notebookId && !!user,
+    // Allow loading notes for public notebooks even without user
+    enabled: !!notebookId && (!!user || isPublic),
   });
 
   const createNoteMutation = useMutation({
@@ -48,6 +49,11 @@ export const useNotes = (notebookId?: string) => {
       extracted_text?: string;
     }) => {
       if (!notebookId) throw new Error('Notebook ID is required');
+      
+      // Public users (not logged in) cannot create notes
+      if (isPublic && !user) {
+        throw new Error('No se pueden crear notas en cuadernos públicos sin iniciar sesión');
+      }
       
       const { data, error } = await supabase
         .from('notes')

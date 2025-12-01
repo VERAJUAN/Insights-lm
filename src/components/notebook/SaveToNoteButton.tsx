@@ -9,10 +9,11 @@ interface SaveToNoteButtonProps {
   content: string | { segments: any[]; citations: any[] };
   notebookId?: string;
   onSaved?: () => void;
+  isPublic?: boolean;
 }
 
-const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProps) => {
-  const { createNote, isCreating } = useNotes(notebookId);
+const SaveToNoteButton = ({ content, notebookId, onSaved, isPublic = false }: SaveToNoteButtonProps) => {
+  const { createNote, isCreating } = useNotes(notebookId, isPublic);
   const { isReader } = useUserRole();
 
   const handleSaveToNote = () => {
@@ -64,7 +65,8 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
     onSaved?.();
   };
 
-  if (!notebookId || isReader) return null;
+  // Hide button for readers and public users (not logged in)
+  if (!notebookId || isReader || isPublic) return null;
 
   return (
     <Button

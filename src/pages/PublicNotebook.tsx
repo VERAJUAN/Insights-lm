@@ -46,9 +46,15 @@ const PublicNotebook = () => {
   });
 
   // Public users (not logged in) should NOT see sources (same permissions as reader)
-  // They can only chat with the notebook
+  // They can only chat with the notebook and view notes
   const hasSource = false; // Always false for public users
   const isSourceDocumentOpen = !!selectedCitation;
+  
+  // For public users, hide sources sidebar (same as readers)
+  // Adjust widths: no sources sidebar, chat takes more space
+  const sourcesWidth = 'w-0'; // Hidden for public users
+  const studioWidth = 'w-[30%]';
+  const chatWidth = 'w-[70%]'; // Chat takes more space since sources are hidden
 
   const handleCitationClick = (citation: Citation) => {
     setSelectedCitation(citation);
@@ -57,11 +63,6 @@ const PublicNotebook = () => {
   const handleCitationClose = () => {
     setSelectedCitation(null);
   };
-
-  // Dynamic width calculations for desktop
-  const sourcesWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[25%]';
-  const studioWidth = 'w-[30%]';
-  const chatWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[45%]';
 
   if (isLoading) {
     return (
@@ -117,18 +118,9 @@ const PublicNotebook = () => {
       </header>
 
       {isDesktop ? (
-        // Desktop layout (3-column)
+        // Desktop layout (2-column: chat + notes, no sources)
         <div className="flex-1 flex overflow-hidden">
-          <div className={`${sourcesWidth} flex-shrink-0`}>
-            <SourcesSidebar 
-              hasSource={hasSource || false} 
-              notebookId={notebook.id}
-              selectedCitation={selectedCitation}
-              onCitationClose={handleCitationClose}
-              setSelectedCitation={setSelectedCitation}
-              isPublic={true}
-            />
-          </div>
+          {/* Sources sidebar is hidden for public users (same as readers) */}
           
           <div className={`${chatWidth} flex-shrink-0`}>
             <ChatArea 

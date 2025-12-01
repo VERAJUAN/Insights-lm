@@ -240,7 +240,7 @@ const ChatArea = ({
                             <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} isUserMessage={isUserMessage(msg)} />
                           </div>
                           {isAiMessage(msg) && <div className="mt-2 flex justify-start">
-                              <SaveToNoteButton content={msg.message.content} notebookId={notebookId} />
+                              <SaveToNoteButton content={msg.message.content} notebookId={notebookId} isPublic={isPublic} />
                             </div>}
                         </div>
                       </div>)}

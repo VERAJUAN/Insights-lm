@@ -230,31 +230,9 @@ const SourcesSidebar = ({
     );
   }
 
-  // For readers, completely hide the sources sidebar
-  if (isReader) {
+  // For readers and public users, completely hide the sources sidebar
+  if (isReader || isPublic) {
     return null;
-  }
-
-  // For public users (not logged in), hide sources completely (same permissions as reader)
-  // They can only chat, not view sources or notes
-  if (isPublic) {
-    return (
-      <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-2">
-              Las fuentes no están disponibles para usuarios no registrados
-            </p>
-            <p className="text-xs text-gray-500">
-              Inicia sesión para ver las fuentes y notas del cuaderno
-            </p>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (

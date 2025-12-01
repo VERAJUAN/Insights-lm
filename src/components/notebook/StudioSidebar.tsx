@@ -38,7 +38,7 @@ const StudioSidebar = ({
     isCreating,
     isUpdating,
     isDeleting
-  } = useNotes(notebookId);
+  } = useNotes(notebookId, isPublic);
   const {
     notebooks
   } = useNotebooks();
@@ -221,30 +221,12 @@ const StudioSidebar = ({
 
   if (isEditingMode) {
     return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
-      <NoteEditor note={editingNote || undefined} onSave={handleSaveNote} onDelete={editingNote ? handleDeleteNote : undefined} onCancel={handleCancel} isLoading={isCreating || isUpdating || isDeleting} onCitationClick={onCitationClick} />
+      <NoteEditor note={editingNote || undefined} onSave={handleSaveNote} onDelete={editingNote ? handleDeleteNote : undefined} onCancel={handleCancel} isLoading={isCreating || isUpdating || isDeleting} onCitationClick={onCitationClick} isPublic={isPublic} />
     </div>;
   }
 
-  // For public users (not logged in), hide notes completely (same permissions as reader)
-  if (isPublic) {
-    return (
-      <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-medium text-gray-900">Notas</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-2">
-              Las notas no están disponibles para usuarios no registrados
-            </p>
-            <p className="text-xs text-gray-500">
-              Inicia sesión para ver y crear notas
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // For public users (not logged in), show notes but in read-only mode (same permissions as reader)
+  // They can view notes but not create, edit, or delete them
 
   return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
     <div className="p-4 border-b border-gray-200 flex-shrink-0">
@@ -316,7 +298,7 @@ const StudioSidebar = ({
 
         </div>
 
-        {!isReader && (
+        {!isReader && !isPublic && (
           <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
             <Plus className="h-4 w-4 mr-2" />
             Agregar nota
@@ -348,9 +330,11 @@ const StudioSidebar = ({
                   {new Date(note.updated_at).toLocaleDateString()}
                 </p>
               </div>
-              {note.source_type === 'user' && <Button variant="ghost" size="sm" className="ml-2">
-                <Edit className="h-3 w-3" />
-              </Button>}
+              {note.source_type === 'user' && !isReader && !isPublic && (
+                <Button variant="ghost" size="sm" className="ml-2">
+                  <Edit className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </Card>)}
         </div> : <div className="text-center py-8">
@@ -359,7 +343,7 @@ const StudioSidebar = ({
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Las notas guardadas aparecerán aquí</h3>
           <p className="text-sm text-gray-600">
-            {isReader 
+            {(isReader || isPublic)
               ? 'No hay notas guardadas en este cuaderno todavía.'
               : 'Guarda un mensaje de chat para crear una nueva nota, o haz clic en Agregar nota arriba.'}
           </p>
