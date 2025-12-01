@@ -225,6 +225,27 @@ const StudioSidebar = ({
     </div>;
   }
 
+  // For public users (not logged in), hide notes completely (same permissions as reader)
+  if (isPublic) {
+    return (
+      <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-lg font-medium text-gray-900">Notas</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-2">
+              Las notas no están disponibles para usuarios no registrados
+            </p>
+            <p className="text-xs text-gray-500">
+              Inicia sesión para ver y crear notas
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
     <div className="p-4 border-b border-gray-200 flex-shrink-0">
       {/* <h2 className="text-lg font-medium text-gray-900 mb-4">Studio</h2> */}

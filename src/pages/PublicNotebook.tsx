@@ -45,29 +45,9 @@ const PublicNotebook = () => {
     enabled: !!slug,
   });
 
-  // Fetch sources for the public notebook
-  const { data: sources = [] } = useQuery({
-    queryKey: ['publicSources', notebook?.id],
-    queryFn: async () => {
-      if (!notebook?.id) return [];
-
-      const { data, error } = await supabase
-        .from('sources')
-        .select('*')
-        .eq('notebook_id', notebook.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching sources:', error);
-        return [];
-      }
-
-      return data || [];
-    },
-    enabled: !!notebook?.id,
-  });
-
-  const hasSource = sources && sources.length > 0;
+  // Public users (not logged in) should NOT see sources (same permissions as reader)
+  // They can only chat with the notebook
+  const hasSource = false; // Always false for public users
   const isSourceDocumentOpen = !!selectedCitation;
 
   const handleCitationClick = (citation: Citation) => {
