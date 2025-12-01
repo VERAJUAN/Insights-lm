@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Upload, FileText, Loader2, RefreshCw, Copy, Check } from 'lucide-react';
+import { Send, Upload, FileText, Loader2, RefreshCw, Copy, Check, Edit2, X, Save } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -10,6 +10,8 @@ import { useSources } from '@/hooks/useSources';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useNotebookUpdate } from '@/hooks/useNotebookUpdate';
+import { Textarea } from '@/components/ui/textarea';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
@@ -42,6 +44,8 @@ const ChatArea = ({
   const [showAiLoading, setShowAiLoading] = useState(false);
   const [clickedQuestions, setClickedQuestions] = useState<Set<string>>(new Set());
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState('');
   
   const isGenerating = notebook?.generation_status === 'generating';
   
@@ -54,9 +58,11 @@ const ChatArea = ({
   } = useChatMessages(notebookId, isPublic);
   
   const { user } = useAuth();
-  const { isReader, isLoading: isLoadingRole } = useUserRole();
+  const { isReader, isLoading: isLoadingRole, isAdministrator, isSuperadministrator } = useUserRole();
   const isReadOnly = isReader || isPublic;
   const { toast } = useToast();
+  const { updateNotebook, isUpdating } = useNotebookUpdate();
+  const canEditDescription = (isAdministrator || isSuperadministrator) && notebookId && !isPublic;
   const {
     sources
   } = useSources(notebookId);
@@ -213,6 +219,40 @@ const ChatArea = ({
     }
   };
 
+  // Handle description editing
+  const handleStartEditDescription = () => {
+    setEditedDescription(notebook?.description || '');
+    setIsEditingDescription(true);
+  };
+
+  const handleCancelEditDescription = () => {
+    setIsEditingDescription(false);
+    setEditedDescription('');
+  };
+
+  const handleSaveDescription = async () => {
+    if (!notebookId) return;
+    
+    try {
+      await updateNotebook({
+        id: notebookId,
+        updates: { description: editedDescription || null }
+      });
+      setIsEditingDescription(false);
+      toast({
+        title: "Resumen actualizado",
+        description: "El resumen del cuaderno ha sido actualizado correctamente.",
+      });
+    } catch (error: any) {
+      console.error('Error updating description:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar el resumen. Por favor, inténtelo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Helper function to determine if message is from user
   const isUserMessage = (msg: any) => {
     const messageType = msg.message?.type || msg.message?.role;
@@ -279,11 +319,68 @@ const ChatArea = ({
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                  {isGenerating ? <div className="flex items-center space-x-2 text-gray-600">
-                      
+                <div className="bg-gray-50 rounded-lg p-6 mb-6 relative">
+                  {isGenerating ? (
+                    <div className="flex items-center space-x-2 text-gray-600">
                       <p>La IA está analizando tu fuente y generando un título y descripción...</p>
-                    </div> : <MarkdownRenderer content={notebook?.description || 'No hay descripción disponible para este cuaderno.'} className="prose prose-gray max-w-none text-gray-700 leading-relaxed" />}
+                    </div>
+                  ) : isEditingDescription ? (
+                    <div className="space-y-3">
+                      <Textarea
+                        value={editedDescription}
+                        onChange={(e) => setEditedDescription(e.target.value)}
+                        placeholder="Escribe el resumen del cuaderno..."
+                        className="min-h-[120px] resize-none"
+                        disabled={isUpdating}
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEditDescription}
+                          disabled={isUpdating}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveDescription}
+                          disabled={isUpdating}
+                        >
+                          {isUpdating ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Guardando...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Guardar
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative group">
+                      <MarkdownRenderer 
+                        content={notebook?.description || 'No hay descripción disponible para este cuaderno.'} 
+                        className="prose prose-gray max-w-none text-gray-700 leading-relaxed" 
+                      />
+                      {canEditDescription && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleStartEditDescription}
+                          className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Editar resumen"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Chat Messages */}
