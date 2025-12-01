@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useSources } from '@/hooks/useSources';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useUserRole } from '@/hooks/useUserRole';
 import NotebookHeader from '@/components/notebook/NotebookHeader';
 import SourcesSidebar from '@/components/notebook/SourcesSidebar';
 import ChatArea from '@/components/notebook/ChatArea';
@@ -15,6 +16,7 @@ const Notebook = () => {
   const { id: notebookId } = useParams();
   const { notebooks } = useNotebooks();
   const { sources } = useSources(notebookId);
+  const { isReader } = useUserRole();
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const isDesktop = useIsDesktop();
 
@@ -30,10 +32,13 @@ const Notebook = () => {
     setSelectedCitation(null);
   };
 
-  // Dynamic width calculations for desktop - expand studio when editing notes
-  const sourcesWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[25%]';
+  // Dynamic width calculations for desktop
+  // For readers, hide sources sidebar and expand chat
+  const sourcesWidth = isReader ? 'w-0' : (isSourceDocumentOpen ? 'w-[35%]' : 'w-[25%]');
   const studioWidth = 'w-[30%]'; // Expanded width for note editing
-  const chatWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[45%]';
+  const chatWidth = isReader 
+    ? 'w-[70%]' // Readers: chat takes more space since sources are hidden
+    : (isSourceDocumentOpen ? 'w-[35%]' : 'w-[45%]');
 
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
@@ -45,15 +50,17 @@ const Notebook = () => {
       {isDesktop ? (
         // Desktop layout (3-column)
         <div className="flex-1 flex overflow-hidden">
-          <div className={`${sourcesWidth} flex-shrink-0`}>
-            <SourcesSidebar 
-              hasSource={hasSource || false} 
-              notebookId={notebookId}
-              selectedCitation={selectedCitation}
-              onCitationClose={handleCitationClose}
-              setSelectedCitation={setSelectedCitation}
-            />
-          </div>
+          {!isReader && (
+            <div className={`${sourcesWidth} flex-shrink-0`}>
+              <SourcesSidebar 
+                hasSource={hasSource || false} 
+                notebookId={notebookId}
+                selectedCitation={selectedCitation}
+                onCitationClose={handleCitationClose}
+                setSelectedCitation={setSelectedCitation}
+              />
+            </div>
+          )}
           
           <div className={`${chatWidth} flex-shrink-0`}>
             <ChatArea 

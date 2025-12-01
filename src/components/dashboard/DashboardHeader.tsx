@@ -5,6 +5,7 @@ import { User, LogOut } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useLogout } from '@/services/authService';
 import Logo from '@/components/ui/Logo';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface DashboardHeaderProps {
   userEmail?: string;
@@ -12,6 +13,8 @@ interface DashboardHeaderProps {
 
 const DashboardHeader = ({ userEmail }: DashboardHeaderProps) => {
   const { logout } = useLogout();
+  const { profile } = useUserRole();
+  const fullName = profile?.full_name || '';
 
   return (
     <header className="bg-white px-6 py-4">
@@ -22,6 +25,11 @@ const DashboardHeader = ({ userEmail }: DashboardHeaderProps) => {
         </div>
         
         <div className="flex items-center space-x-4">
+          {fullName && (
+            <span className="text-sm text-gray-700">
+              Hola {fullName}
+            </span>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="p-0">

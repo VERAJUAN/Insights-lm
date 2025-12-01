@@ -85,12 +85,14 @@ export const useNotebookDelete = () => {
       
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['allOrganizationsWithDetails'] });
       queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
       queryClient.invalidateQueries({ queryKey: ['notebook', notebookId] });
       
       toast({
-        title: "Notebook deleted",
-        description: `"${deletedNotebook?.title || 'Notebook'}" and all its sources have been successfully deleted.`,
+        title: "Cuaderno eliminado",
+        description: `"${deletedNotebook?.title || 'Cuaderno'}" y todos sus fuentes han sido eliminados correctamente.`,
       });
     },
     onError: (error: any) => {

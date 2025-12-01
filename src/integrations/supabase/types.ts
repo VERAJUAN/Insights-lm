@@ -34,17 +34,17 @@ export type Database = {
         Row: {
           id: number
           message: Json
-          session_id: string
+          session_id: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Insert: {
           id?: number
           message: Json
-          session_id: string
+          session_id: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Update: {
           id?: number
           message?: Json
-          session_id?: string
+          session_id?: string  // Format: "notebook_id" or "notebook_id_user_id"
         }
         Relationships: []
       }
@@ -60,6 +60,9 @@ export type Database = {
           generation_status: string | null
           icon: string | null
           id: string
+          is_public: boolean
+          organization_id: string | null
+          public_slug: string | null
           title: string
           updated_at: string
           user_id: string
@@ -75,6 +78,9 @@ export type Database = {
           generation_status?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
+          organization_id?: string | null
+          public_slug?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -90,6 +96,9 @@ export type Database = {
           generation_status?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
+          organization_id?: string | null
+          public_slug?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -102,7 +111,74 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notebooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      notebook_assignments: {
+        Row: {
+          id: string
+          notebook_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          notebook_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          notebook_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebook_assignments_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notebook_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          custom_prompt: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          custom_prompt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          custom_prompt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       notes: {
         Row: {
@@ -152,6 +228,8 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          organization_id: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
           updated_at: string
         }
         Insert: {
@@ -160,6 +238,8 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
         }
         Update: {
@@ -168,9 +248,19 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sources: {
         Row: {
@@ -347,6 +437,7 @@ export type Database = {
     }
     Enums: {
       source_type: "pdf" | "text" | "website" | "youtube" | "audio"
+      user_role: "superadministrator" | "administrator" | "reader"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -463,6 +554,7 @@ export const Constants = {
   public: {
     Enums: {
       source_type: ["pdf", "text", "website", "youtube", "audio"],
+      user_role: ["superadministrator", "administrator", "reader"],
     },
   },
 } as const

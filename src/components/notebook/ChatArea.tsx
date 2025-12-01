@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Upload, FileText, Loader2, RefreshCw } from 'lucide-react';
@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useSources } from '@/hooks/useSources';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
@@ -24,13 +26,15 @@ interface ChatAreaProps {
     example_questions?: string[];
   } | null;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
 const ChatArea = ({
   hasSource,
   notebookId,
   notebook,
-  onCitationClick
+  onCitationClick,
+  isPublic = false
 }: ChatAreaProps) => {
   const [message, setMessage] = useState('');
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
@@ -46,18 +50,33 @@ const ChatArea = ({
     isSending,
     deleteChatHistory,
     isDeletingChatHistory
-  } = useChatMessages(notebookId);
+  } = useChatMessages(notebookId, isPublic);
   
+  const { user } = useAuth();
+  const { isReader, isLoading: isLoadingRole } = useUserRole();
+  const isReadOnly = isReader || isPublic;
   const {
     sources
   } = useSources(notebookId);
   
   const sourceCount = sources?.length || 0;
 
-  // Check if at least one source has been successfully processed
-  const hasProcessedSource = sources?.some(source => source.processing_status === 'completed') || false;
+  // For readers, show content if notebook exists (even without sources)
+  // For other users, require sources
+  // Don't show empty state while loading role to prevent button flash
+  const shouldShowContent = isLoadingRole
+    ? !!notebook // While loading, show content if notebook exists (prevents empty state flash)
+    : (isReadOnly 
+      ? !!notebook // Readers can see content if notebook exists
+      : hasSource); // Other users need sources
 
-  // Chat should be disabled if there are no processed sources
+  // Check if at least one source has been successfully processed
+  // For readers and public users, assume sources are processed if they have access to the notebook
+  const hasProcessedSource = isReadOnly 
+    ? true // Readers and public users can chat if they have access to the notebook (assumes sources are processed)
+    : sources?.some(source => source.processing_status === 'completed') || false;
+
+  // Chat should be disabled if there are no processed sources (except for readers)
   const isChatDisabled = !hasProcessedSource;
 
   // Track when we send a message to show loading state
@@ -66,14 +85,42 @@ const ChatArea = ({
   // Ref for auto-scrolling to the most recent message
   const latestMessageRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // For anonymous users, check if the pending message is already in messages
+  // This prevents showing the message twice (once from pendingUserMessage, once from messages)
+  const shouldShowPendingMessage = useMemo(() => {
+    if (!pendingUserMessage) return false;
+    
+    // For anonymous users, check if message is already in the messages array
+    if (isPublic && !user?.id) {
+      const isInMessages = messages.some(msg => 
+        msg.message.type === 'human' &&
+        typeof msg.message.content === 'string' &&
+        msg.message.content === pendingUserMessage
+      );
+      return !isInMessages; // Only show pending if not already in messages
+    }
+    
+    return true; // For authenticated users, always show pending
+  }, [pendingUserMessage, messages, isPublic, user?.id]);
   useEffect(() => {
     // If we have new messages and we have a pending message, clear it
-    if (messages.length > lastMessageCount && pendingUserMessage) {
-      setPendingUserMessage(null);
-      setShowAiLoading(false);
+    if (messages.length > lastMessageCount) {
+      // Check if the last message is from AI (which means the response arrived)
+      const lastMessage = messages[messages.length - 1];
+      const isAiMessage = lastMessage?.message?.type === 'ai' || lastMessage?.message?.role === 'assistant';
+      
+      if (pendingUserMessage && isAiMessage) {
+        console.log('AI response received, clearing loading state');
+        setPendingUserMessage(null);
+        setShowAiLoading(false);
+      } else if (pendingUserMessage && messages.length > lastMessageCount) {
+        // If we have more messages but no AI response yet, keep waiting
+        console.log('More messages received, but waiting for AI response');
+      }
     }
     setLastMessageCount(messages.length);
-  }, [messages.length, lastMessageCount, pendingUserMessage]);
+  }, [messages, lastMessageCount, pendingUserMessage]);
 
   // Auto-scroll when pending message is set, when messages update, or when AI loading appears
   useEffect(() => {
@@ -157,6 +204,9 @@ const ChatArea = ({
 
   // Update placeholder text based on processing status
   const getPlaceholderText = () => {
+    if (isReadOnly) {
+      return "Escribe tu pregunta...";
+    }
     if (isChatDisabled) {
       if (sourceCount === 0) {
         return "Sube una fuente para comenzar...";
@@ -167,7 +217,7 @@ const ChatArea = ({
     return "Comienza a escribir...";
   };
   return <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {hasSource ? <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {shouldShowContent ? <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Chat Header */}
           <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -191,7 +241,7 @@ const ChatArea = ({
                     <h1 className="text-2xl font-medium text-gray-900">
                       {isGenerating ? 'Generando contenido...' : notebook?.title || 'Cuaderno sin título'}
                     </h1>
-                    <p className="text-sm text-gray-600">{sourceCount} fuente{sourceCount !== 1 ? 's' : ''}</p>
+                    {!isReader && <p className="text-sm text-gray-600">{sourceCount} fuente{sourceCount !== 1 ? 's' : ''}</p>}
                   </div>
                 </div>
                 
@@ -203,20 +253,20 @@ const ChatArea = ({
                 </div>
 
                 {/* Chat Messages */}
-                {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
+                {(messages.length > 0 || shouldShowPendingMessage || showAiLoading) && <div className="mb-6 space-y-4">
                     {messages.map((msg, index) => <div key={msg.id} className={`flex ${isUserMessage(msg) ? 'justify-end' : 'justify-start'}`}>
                         <div className={`${isUserMessage(msg) ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
                           <div className={isUserMessage(msg) ? '' : 'prose prose-gray max-w-none text-gray-800'}>
                             <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} isUserMessage={isUserMessage(msg)} />
                           </div>
                           {isAiMessage(msg) && <div className="mt-2 flex justify-start">
-                              <SaveToNoteButton content={msg.message.content} notebookId={notebookId} />
+                              <SaveToNoteButton content={msg.message.content} notebookId={notebookId} isPublic={isPublic} />
                             </div>}
                         </div>
                       </div>)}
                     
-                    {/* Pending user message */}
-                    {pendingUserMessage && <div className="flex justify-end">
+                    {/* Pending user message - only show if not already in messages */}
+                    {shouldShowPendingMessage && <div className="flex justify-end">
                         <div className="max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg">
                           <MarkdownRenderer content={pendingUserMessage} className="" isUserMessage={true} />
                         </div>
@@ -247,10 +297,12 @@ const ChatArea = ({
             <div className="max-w-4xl mx-auto">
               <div className="flex space-x-4">
                 <div className="flex-1 relative">
-                  <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className="pr-12" disabled={isChatDisabled || isSending || !!pendingUserMessage} />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                    {sourceCount} fuente{sourceCount !== 1 ? 's' : ''}
-                  </div>
+                  <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className={isReader ? "" : "pr-12"} disabled={isChatDisabled || isSending || !!pendingUserMessage} />
+                  {!isReader && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                      {sourceCount} fuente{sourceCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
                 <Button onClick={() => handleSendMessage()} disabled={!message.trim() || isChatDisabled || isSending || !!pendingUserMessage}>
                   {isSending || pendingUserMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -282,11 +334,15 @@ const ChatArea = ({
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-gray-100">
               <Upload className="h-8 w-8 text-slate-600" />
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-4">Agrega una fuente para comenzar</h2>
-            <Button onClick={() => setShowAddSourcesDialog(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Subir una fuente
-            </Button>
+            <h2 className="text-xl font-medium text-gray-900 mb-4">
+              {isReadOnly ? 'Chat con el cuaderno' : 'Agrega una fuente para comenzar'}
+            </h2>
+            {!isReadOnly && !isLoadingRole && (
+              <Button onClick={() => setShowAddSourcesDialog(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Subir una fuente
+              </Button>
+            )}
           </div>
 
           {/* Bottom Input */}

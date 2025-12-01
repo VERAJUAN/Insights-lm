@@ -11,6 +11,7 @@ import RenameSourceDialog from './RenameSourceDialog';
 import SourceContentViewer from '@/components/chat/SourceContentViewer';
 import { useSources } from '@/hooks/useSources';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Citation } from '@/types/message';
 
 interface SourcesSidebarProps {
@@ -19,6 +20,7 @@ interface SourcesSidebarProps {
   selectedCitation?: Citation | null;
   onCitationClose?: () => void;
   setSelectedCitation?: (citation: Citation | null) => void;
+  isPublic?: boolean;
 }
 
 const SourcesSidebar = ({
@@ -26,7 +28,8 @@ const SourcesSidebar = ({
   notebookId,
   selectedCitation,
   onCitationClose,
-  setSelectedCitation
+  setSelectedCitation,
+  isPublic = false
 }: SourcesSidebarProps) => {
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -34,6 +37,8 @@ const SourcesSidebar = ({
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [selectedSourceForViewing, setSelectedSourceForViewing] = useState<any>(null);
 
+  const { isReader } = useUserRole();
+  const isReadOnly = isReader || isPublic;
   const {
     sources,
     isLoading
@@ -225,6 +230,11 @@ const SourcesSidebar = ({
     );
   }
 
+  // For readers and public users, completely hide the sources sidebar
+  if (isReader || isPublic) {
+    return null;
+  }
+
   return (
     <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
@@ -232,12 +242,14 @@ const SourcesSidebar = ({
           <h2 className="text-lg font-medium text-gray-900">Fuentes</h2>
         </div>
         
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowAddSourcesDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar
-          </Button>
-        </div>
+        {!isReadOnly && (
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowAddSourcesDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar
+            </Button>
+          </div>
+        )}
       </div>
 
       <ScrollArea className="flex-1 h-full">
@@ -263,39 +275,47 @@ const SourcesSidebar = ({
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0 py-[4px]">
                           {renderProcessingStatus(source.processing_status)}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-700 hover:text-gray-900"
-                            onClick={(e) => { e.stopPropagation(); handleRenameSource(source); }}
-                            title="Renombrar fuente"
-                            aria-label="Renombrar fuente"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-600 hover:text-red-700"
-                            onClick={(e) => { e.stopPropagation(); handleRemoveSource(source); }}
-                            title="Eliminar fuente"
-                            aria-label="Eliminar fuente"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!isReadOnly && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-700 hover:text-gray-900"
+                                onClick={(e) => { e.stopPropagation(); handleRenameSource(source); }}
+                                title="Renombrar fuente"
+                                aria-label="Renombrar fuente"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700"
+                                onClick={(e) => { e.stopPropagation(); handleRemoveSource(source); }}
+                                title="Eliminar fuente"
+                                aria-label="Eliminar fuente"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </Card>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onClick={() => handleRenameSource(source)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Renombrar fuente
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={() => handleRemoveSource(source)} className="text-red-600 focus:text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar fuente
-                    </ContextMenuItem>
+                    {!isReadOnly && (
+                      <>
+                        <ContextMenuItem onClick={() => handleRenameSource(source)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Renombrar fuente
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => handleRemoveSource(source)} className="text-red-600 focus:text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar fuente
+                        </ContextMenuItem>
+                      </>
+                    )}
                   </ContextMenuContent>
                 </ContextMenu>
               ))}

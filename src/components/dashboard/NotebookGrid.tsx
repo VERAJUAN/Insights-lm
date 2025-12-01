@@ -5,6 +5,7 @@ import NotebookCard from './NotebookCard';
 import { Check, Grid3X3, List, ChevronDown } from 'lucide-react';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +20,12 @@ const NotebookGrid = () => {
     notebooks,
     isLoading,
     createNotebook,
-    isCreating
+    isCreating,
+    canCreate,
+    notebookCount,
+    maxNotebooks
   } = useNotebooks();
+  const { isSuperadministrator, isReader } = useUserRole();
   const navigate = useNavigate();
 
   const sortedNotebooks = useMemo(() => {
@@ -71,9 +76,32 @@ const NotebookGrid = () => {
 
   return <div>
       <div className="flex items-center justify-between mb-8">
-        <Button className="bg-black hover:bg-gray-800 text-white rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
-          {isCreating ? 'Creando...' : '+ Crear nuevo'}
-        </Button>
+        <div className="flex items-center gap-4">
+          {isReader ? (
+            <div>
+              <h2 className="text-xl font-medium text-gray-900">Tus cuadernos disponibles</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Estos son los cuadernos que han sido asignados para ti
+              </p>
+            </div>
+          ) : (
+            <>
+              <Button 
+                className="bg-black hover:bg-gray-800 text-white rounded-full px-6" 
+                onClick={handleCreateNotebook} 
+                disabled={isCreating || !canCreate}
+                title={!canCreate && maxNotebooks ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
+              >
+                {isCreating ? 'Creando...' : '+ Crear nuevo'}
+              </Button>
+              {maxNotebooks && (
+                <span className="text-sm text-gray-500">
+                  {notebookCount} / {maxNotebooks} cuadernos
+                </span>
+              )}
+            </>
+          )}
+        </div>
         
         <div className="flex items-center space-x-4">
           <DropdownMenu>
@@ -109,7 +137,8 @@ const NotebookGrid = () => {
           }),
           sources: notebook.sources?.[0]?.count || 0,
           icon: notebook.icon || '📝',
-          color: notebook.color || 'bg-gray-100'
+          color: notebook.color || 'bg-gray-100',
+          organizationName: isSuperadministrator ? (notebook as any).organization_name : undefined
         }} />
           </div>)}
       </div>

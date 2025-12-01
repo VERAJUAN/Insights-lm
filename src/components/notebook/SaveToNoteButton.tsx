@@ -3,15 +3,18 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
 import { useNotes } from '@/hooks/useNotes';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface SaveToNoteButtonProps {
   content: string | { segments: any[]; citations: any[] };
   notebookId?: string;
   onSaved?: () => void;
+  isPublic?: boolean;
 }
 
-const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProps) => {
-  const { createNote, isCreating } = useNotes(notebookId);
+const SaveToNoteButton = ({ content, notebookId, onSaved, isPublic = false }: SaveToNoteButtonProps) => {
+  const { createNote, isCreating } = useNotes(notebookId, isPublic);
+  const { isReader } = useUserRole();
 
   const handleSaveToNote = () => {
     if (!notebookId) return;
@@ -34,7 +37,7 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
       // For AI responses with citations, save the structured content as JSON
       contentText = JSON.stringify(content);
       // Generate title from the first segment's text
-      const firstSegmentText = content.segments[0]?.text || 'AI Response';
+      const firstSegmentText = content.segments[0]?.text || 'AI Respuesta';
       title = firstSegmentText.length > 50 ? firstSegmentText.substring(0, 47) + '...' : firstSegmentText;
       source_type = 'ai_response';
       
@@ -62,7 +65,8 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
     onSaved?.();
   };
 
-  if (!notebookId) return null;
+  // Hide button for readers and public users (not logged in)
+  if (!notebookId || isReader || isPublic) return null;
 
   return (
     <Button

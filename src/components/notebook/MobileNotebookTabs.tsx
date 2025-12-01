@@ -22,12 +22,14 @@ interface MobileNotebookTabsProps {
   onCitationClose?: () => void;
   setSelectedCitation?: (citation: Citation | null) => void;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
 const MobileNotebookTabs = ({
   hasSource,
   notebookId,
   notebook,
+  isPublic = false,
   selectedCitation,
   onCitationClose,
   setSelectedCitation,
@@ -66,6 +68,7 @@ const MobileNotebookTabs = ({
           selectedCitation={selectedCitation}
           onCitationClose={onCitationClose}
           setSelectedCitation={setSelectedCitation}
+          isPublic={isPublic}
         />
       </TabsContent>
 
@@ -75,13 +78,15 @@ const MobileNotebookTabs = ({
           notebookId={notebookId}
           notebook={notebook}
           onCitationClick={onCitationClick}
+          isPublic={isPublic}
         />
       </TabsContent>
 
       <TabsContent value="studio" className="flex-1 overflow-hidden mt-0">
         <StudioSidebar 
-          notebookId={notebookId}
+          notebookId={notebookId} 
           onCitationClick={onCitationClick}
+          isPublic={isPublic}
         />
       </TabsContent>
     </Tabs>

@@ -8,6 +8,7 @@ import { useAudioOverview } from '@/hooks/useAudioOverview';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useSources } from '@/hooks/useSources';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUserRole } from '@/hooks/useUserRole';
 import NoteEditor from './NoteEditor';
 import AudioPlayer from './AudioPlayer';
 import { Citation } from '@/types/message';
@@ -16,12 +17,14 @@ interface StudioSidebarProps {
   notebookId?: string;
   isExpanded?: boolean;
   onCitationClick?: (citation: Citation) => void;
+  isPublic?: boolean;
 }
 
 const StudioSidebar = ({
   notebookId,
   isExpanded,
-  onCitationClick
+  onCitationClick,
+  isPublic = false
 }: StudioSidebarProps) => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -35,7 +38,7 @@ const StudioSidebar = ({
     isCreating,
     isUpdating,
     isDeleting
-  } = useNotes(notebookId);
+  } = useNotes(notebookId, isPublic);
   const {
     notebooks
   } = useNotebooks();
@@ -52,6 +55,7 @@ const StudioSidebar = ({
     checkAudioExpiry
   } = useAudioOverview(notebookId);
   const queryClient = useQueryClient();
+  const { isReader } = useUserRole();
   const notebook = notebooks?.find(n => n.id === notebookId);
   const hasValidAudio = notebook?.audio_overview_url && !checkAudioExpiry(notebook.audio_url_expires_at);
   const currentStatus = generationStatus || notebook?.audio_overview_generation_status;
@@ -89,8 +93,14 @@ const StudioSidebar = ({
       noteId: note.id,
       sourceType: note.source_type
     });
-    setEditingNote(note);
-    setIsCreatingNote(false);
+    // Lectores solo pueden ver notas, no editarlas
+    if (isReader) {
+      setEditingNote(note);
+      setIsCreatingNote(false);
+    } else {
+      setEditingNote(note);
+      setIsCreatingNote(false);
+    }
   };
 
   const handleSaveNote = (title: string, content: string) => {
@@ -211,9 +221,12 @@ const StudioSidebar = ({
 
   if (isEditingMode) {
     return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
-      <NoteEditor note={editingNote || undefined} onSave={handleSaveNote} onDelete={editingNote ? handleDeleteNote : undefined} onCancel={handleCancel} isLoading={isCreating || isUpdating || isDeleting} onCitationClick={onCitationClick} />
+      <NoteEditor note={editingNote || undefined} onSave={handleSaveNote} onDelete={editingNote ? handleDeleteNote : undefined} onCancel={handleCancel} isLoading={isCreating || isUpdating || isDeleting} onCitationClick={onCitationClick} isPublic={isPublic} />
     </div>;
   }
+
+  // For public users (not logged in), show notes but in read-only mode (same permissions as reader)
+  // They can view notes but not create, edit, or delete them
 
   return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
     <div className="p-4 border-b border-gray-200 flex-shrink-0">
@@ -285,10 +298,12 @@ const StudioSidebar = ({
 
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar nota
-        </Button>
+        {!isReader && !isPublic && (
+          <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar nota
+          </Button>
+        )}
       </div>
     </div>
 
@@ -304,7 +319,7 @@ const StudioSidebar = ({
                 <div className="flex items-center space-x-2 mb-1">
                   {note.source_type === 'ai_response' ? <Bot className="h-3 w-3 text-blue-600" /> : <User className="h-3 w-3 text-gray-600" />}
                   <span className="text-xs text-gray-500 uppercase">
-                    {note.source_type === 'ai_response' ? 'AI Response' : 'Note'}
+                    {note.source_type === 'ai_response' ? 'AI Respuesta' : 'Nota'}
                   </span>
                 </div>
                 <h4 className="font-medium text-gray-900 truncate">{note.title}</h4>
@@ -315,9 +330,11 @@ const StudioSidebar = ({
                   {new Date(note.updated_at).toLocaleDateString()}
                 </p>
               </div>
-              {note.source_type === 'user' && <Button variant="ghost" size="sm" className="ml-2">
-                <Edit className="h-3 w-3" />
-              </Button>}
+              {note.source_type === 'user' && !isReader && !isPublic && (
+                <Button variant="ghost" size="sm" className="ml-2">
+                  <Edit className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </Card>)}
         </div> : <div className="text-center py-8">
@@ -326,7 +343,9 @@ const StudioSidebar = ({
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Las notas guardadas aparecerán aquí</h3>
           <p className="text-sm text-gray-600">
-            Guarda un mensaje de chat para crear una nueva nota, o haz clic en Agregar nota arriba.
+            {(isReader || isPublic)
+              ? 'No hay notas guardadas en este cuaderno todavía.'
+              : 'Guarda un mensaje de chat para crear una nueva nota, o haz clic en Agregar nota arriba.'}
           </p>
         </div>}
       </div>
