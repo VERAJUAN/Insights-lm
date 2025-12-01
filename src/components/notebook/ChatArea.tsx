@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Upload, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { Send, Upload, FileText, Loader2, RefreshCw, Copy, Check } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -9,6 +9,7 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useSources } from '@/hooks/useSources';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
@@ -55,6 +56,7 @@ const ChatArea = ({
   const { user } = useAuth();
   const { isReader, isLoading: isLoadingRole } = useUserRole();
   const isReadOnly = isReader || isPublic;
+  const { toast } = useToast();
   const {
     sources
   } = useSources(notebookId);
@@ -163,7 +165,6 @@ const ChatArea = ({
   };
   const handleRefreshChat = () => {
     if (notebookId) {
-      console.log('Refresh button clicked for notebook:', notebookId);
       deleteChatHistory(notebookId);
       // Reset clicked questions when chat is refreshed
       setClickedQuestions(new Set());
@@ -177,6 +178,39 @@ const ChatArea = ({
     setClickedQuestions(prev => new Set(prev).add(question));
     setMessage(question);
     handleSendMessage(question);
+  };
+
+  // Helper function to extract plain text from message content
+  const extractPlainText = (content: string | { segments: any[]; citations: any[] }): string => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (typeof content === 'object' && content && 'segments' in content && Array.isArray(content.segments)) {
+      // Extract text from all segments
+      return content.segments.map((segment: any) => segment.text || '').join(' ');
+    }
+    
+    return String(content);
+  };
+
+  // Handle copy to clipboard
+  const handleCopyToClipboard = async (content: string | { segments: any[]; citations: any[] }) => {
+    try {
+      const textToCopy = extractPlainText(content);
+      await navigator.clipboard.writeText(textToCopy);
+      toast({
+        title: "Copiado",
+        description: "La respuesta ha sido copiada al portapapeles.",
+      });
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo copiar al portapapeles. Por favor, inténtelo de nuevo.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Helper function to determine if message is from user
@@ -259,7 +293,17 @@ const ChatArea = ({
                           <div className={isUserMessage(msg) ? '' : 'prose prose-gray max-w-none text-gray-800'}>
                             <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} isUserMessage={isUserMessage(msg)} />
                           </div>
-                          {isAiMessage(msg) && <div className="mt-2 flex justify-start">
+                          {isAiMessage(msg) && <div className="mt-2 flex justify-start items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyToClipboard(msg.message.content)}
+                                className="flex items-center space-x-1 text-gray-600 hover:text-gray-800"
+                                title="Copiar respuesta"
+                              >
+                                <Copy className="h-3 w-3" />
+                                <span className="text-xs">Copiar</span>
+                              </Button>
                               <SaveToNoteButton content={msg.message.content} notebookId={notebookId} isPublic={isPublic} />
                             </div>}
                         </div>
