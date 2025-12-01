@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Upload, FileText, Loader2, RefreshCw } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useSources } from '@/hooks/useSources';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
@@ -51,6 +52,7 @@ const ChatArea = ({
     isDeletingChatHistory
   } = useChatMessages(notebookId, isPublic);
   
+  const { user } = useAuth();
   const { isReader, isLoading: isLoadingRole } = useUserRole();
   const isReadOnly = isReader || isPublic;
   const {
@@ -83,6 +85,24 @@ const ChatArea = ({
   // Ref for auto-scrolling to the most recent message
   const latestMessageRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // For anonymous users, check if the pending message is already in messages
+  // This prevents showing the message twice (once from pendingUserMessage, once from messages)
+  const shouldShowPendingMessage = useMemo(() => {
+    if (!pendingUserMessage) return false;
+    
+    // For anonymous users, check if message is already in the messages array
+    if (isPublic && !user?.id) {
+      const isInMessages = messages.some(msg => 
+        msg.message.type === 'human' &&
+        typeof msg.message.content === 'string' &&
+        msg.message.content === pendingUserMessage
+      );
+      return !isInMessages; // Only show pending if not already in messages
+    }
+    
+    return true; // For authenticated users, always show pending
+  }, [pendingUserMessage, messages, isPublic, user?.id]);
   useEffect(() => {
     // If we have new messages and we have a pending message, clear it
     if (messages.length > lastMessageCount) {
@@ -233,7 +253,7 @@ const ChatArea = ({
                 </div>
 
                 {/* Chat Messages */}
-                {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
+                {(messages.length > 0 || shouldShowPendingMessage || showAiLoading) && <div className="mb-6 space-y-4">
                     {messages.map((msg, index) => <div key={msg.id} className={`flex ${isUserMessage(msg) ? 'justify-end' : 'justify-start'}`}>
                         <div className={`${isUserMessage(msg) ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
                           <div className={isUserMessage(msg) ? '' : 'prose prose-gray max-w-none text-gray-800'}>
@@ -245,8 +265,8 @@ const ChatArea = ({
                         </div>
                       </div>)}
                     
-                    {/* Pending user message */}
-                    {pendingUserMessage && <div className="flex justify-end">
+                    {/* Pending user message - only show if not already in messages */}
+                    {shouldShowPendingMessage && <div className="flex justify-end">
                         <div className="max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg">
                           <MarkdownRenderer content={pendingUserMessage} className="" isUserMessage={true} />
                         </div>
