@@ -156,7 +156,7 @@ export const useNotebooks = () => {
       // Check if user can create notebooks
       if (!canCreateNotebook(role, notebooks.length)) {
         if (isAdministrator && notebooks.length >= MAX_NOTEBOOKS_FOR_ADMINISTRATOR) {
-          throw new Error(`Has alcanzado el límite de ${MAX_NOTEBOOKS_FOR_ADMINISTRATOR} cuadernos permitidos para administradores.`);
+          throw new Error('Está superando la cantidad de cuadernos máximo permitido. Contacte con el proveedor para ampliar la capacidad.');
         }
         throw new Error('No tienes permisos para crear cuadernos.');
       }

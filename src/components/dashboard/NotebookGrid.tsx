@@ -6,16 +6,27 @@ import { Check, Grid3X3, List, ChevronDown } from 'lucide-react';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
+import { MAX_NOTEBOOKS_FOR_ADMINISTRATOR } from '@/utils/permissions';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const NotebookGrid = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('Más reciente');
+  const [showLimitDialog, setShowLimitDialog] = useState(false);
   const {
     notebooks,
     isLoading,
@@ -25,7 +36,7 @@ const NotebookGrid = () => {
     notebookCount,
     maxNotebooks
   } = useNotebooks();
-  const { isSuperadministrator, isReader } = useUserRole();
+  const { isSuperadministrator, isReader, isAdministrator } = useUserRole();
   const navigate = useNavigate();
 
   const sortedNotebooks = useMemo(() => {
@@ -43,6 +54,17 @@ const NotebookGrid = () => {
   }, [notebooks, sortBy]);
 
   const handleCreateNotebook = () => {
+    // Check if administrator has reached the limit
+    if (isAdministrator && notebookCount >= MAX_NOTEBOOKS_FOR_ADMINISTRATOR) {
+      setShowLimitDialog(true);
+      return;
+    }
+
+    // If can't create for other reasons, don't proceed
+    if (!canCreate) {
+      return;
+    }
+
     createNotebook({
       title: 'Cuaderno sin título',
       description: ''
@@ -89,8 +111,8 @@ const NotebookGrid = () => {
               <Button 
                 className="bg-black hover:bg-gray-800 text-white rounded-full px-6" 
                 onClick={handleCreateNotebook} 
-                disabled={isCreating || !canCreate}
-                title={!canCreate && maxNotebooks ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
+                disabled={isCreating || (!canCreate && !isAdministrator)}
+                title={!canCreate && maxNotebooks && !isAdministrator ? `Has alcanzado el límite de ${maxNotebooks} cuadernos` : ''}
               >
                 {isCreating ? 'Creando...' : '+ Crear nuevo'}
               </Button>
@@ -142,6 +164,23 @@ const NotebookGrid = () => {
         }} />
           </div>)}
       </div>
+
+      {/* Alert Dialog for Notebook Limit */}
+      <AlertDialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Límite de cuadernos alcanzado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Está superando la cantidad de cuadernos máximo permitido. Contacte con el proveedor para ampliar la capacidad.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowLimitDialog(false)}>
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>;
 };
 
