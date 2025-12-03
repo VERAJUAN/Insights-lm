@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useLogout } from '@/services/authService';
 import Logo from '@/components/ui/Logo';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useOrganization } from '@/hooks/useOrganization';
 
 interface DashboardHeaderProps {
   userEmail?: string;
@@ -15,13 +16,15 @@ const DashboardHeader = ({ userEmail }: DashboardHeaderProps) => {
   const { logout } = useLogout();
   const { profile } = useUserRole();
   const fullName = profile?.full_name || '';
+  const { organization } = useOrganization();
+  const brandName = organization?.name || 'CampusLM';
 
   return (
     <header className="bg-white px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Logo />
-          <h1 className="text-xl font-medium text-gray-900">CampusLM</h1>
+          <Logo src={organization?.logo_url || undefined} alt={brandName} />
+          <h1 className="text-xl font-medium text-gray-900">{brandName}</h1>
         </div>
         
         <div className="flex items-center space-x-4">

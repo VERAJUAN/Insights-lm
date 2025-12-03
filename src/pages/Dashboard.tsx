@@ -9,6 +9,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSystemStatus } from '@/hooks/useSystemStatus';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrganizationPromptEditor from '@/components/admin/OrganizationPromptEditor';
+import OrganizationBrandingEditor from '@/components/admin/OrganizationBrandingEditor';
 import NotebookAssignment from '@/components/admin/NotebookAssignment';
 import UserManagement from '@/components/admin/UserManagement';
 import OrganizationsOverview from '@/components/admin/OrganizationsOverview';
@@ -180,6 +181,7 @@ const Dashboard = () => {
             {isAdministrator && (
               <>
                 <TabsContent value="prompt" className="mt-6">
+                  <OrganizationBrandingEditor />
                   <OrganizationPromptEditor />
                 </TabsContent>
                 <TabsContent value="assignments" className="mt-6">

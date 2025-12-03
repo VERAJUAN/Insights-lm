@@ -10,6 +10,8 @@ import { useDocumentProcessing } from '@/hooks/useDocumentProcessing';
 import { useNotebookGeneration } from '@/hooks/useNotebookGeneration';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import Logo from '@/components/ui/Logo';
+import { useOrganization } from '@/hooks/useOrganization';
 
 interface AddSourcesDialogProps {
   open: boolean;
@@ -26,6 +28,8 @@ const AddSourcesDialog = ({
   const [showCopiedTextDialog, setShowCopiedTextDialog] = useState(false);
   const [showMultipleWebsiteDialog, setShowMultipleWebsiteDialog] = useState(false);
   const [isLocallyProcessing, setIsLocallyProcessing] = useState(false);
+  const { organization } = useOrganization();
+  const brandName = organization?.name || 'CampusLM';
 
   const {
     addSourceAsync,
@@ -451,10 +455,8 @@ const AddSourcesDialog = ({
           <DialogHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-black rounded flex items-center justify-center overflow-hidden">
-                  <img src="/favicon.png" alt="Logo" className="w-4 h-4" />
-                </div>
-                <DialogTitle className="text-xl font-medium">CampusLM</DialogTitle>
+                <Logo size="sm" src={organization?.logo_url || undefined} alt={brandName} />
+                <DialogTitle className="text-xl font-medium">{brandName}</DialogTitle>
               </div>
             </div>
           </DialogHeader>

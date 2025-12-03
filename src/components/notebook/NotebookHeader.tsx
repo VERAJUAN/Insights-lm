@@ -22,6 +22,7 @@ import { useLogout } from '@/services/authService';
 import Logo from '@/components/ui/Logo';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useNotebookPublic } from '@/hooks/useNotebookPublic';
+import { useOrganization } from '@/hooks/useOrganization';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface NotebookHeaderProps {
@@ -33,6 +34,8 @@ const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
   const navigate = useNavigate();
   const { logout } = useLogout();
   const { profile, isAdministrator, isSuperadministrator } = useUserRole();
+  const { organization } = useOrganization();
+  const brandName = organization?.name || 'CampusLM';
   const fullName = profile?.full_name || '';
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
@@ -112,7 +115,7 @@ const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
               onClick={handleIconClick}
               className="hover:bg-gray-50 rounded transition-colors p-1"
             >
-              <Logo />
+              <Logo src={organization?.logo_url || undefined} alt={brandName} />
             </button>
             {isEditing ? (
               <Input
