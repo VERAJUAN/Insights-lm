@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MoreVertical, Plus, Edit, Bot, User, Loader2, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import Logo from '@/components/ui/Logo';
 import { useNotes, Note } from '@/hooks/useNotes';
 import { useAudioOverview } from '@/hooks/useAudioOverview';
 import { useNotebooks } from '@/hooks/useNotebooks';
@@ -317,9 +318,11 @@ const StudioSidebar = ({
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 mb-1">
-                  {note.source_type === 'ai_response' ? <Bot className="h-3 w-3 text-blue-600" /> : <User className="h-3 w-3 text-gray-600" />}
+                  {note.source_type === 'ai_response'
+                    ? <Logo size="sm" className="w-4 h-4" />
+                    : <User className="h-3 w-3 text-gray-600" />}
                   <span className="text-xs text-gray-500 uppercase">
-                    {note.source_type === 'ai_response' ? 'AI Respuesta' : 'Nota'}
+                    {note.source_type === 'ai_response' ? 'Nota generada por CampusLM' : 'Nota'}
                   </span>
                 </div>
                 <h4 className="font-medium text-gray-900 truncate">{note.title}</h4>

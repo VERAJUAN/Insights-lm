@@ -521,6 +521,8 @@ const AddSourcesDialog = ({
 
             {/* Integration Options */}
             <div className="grid grid-cols-2 gap-4">
+              {/* Opción de enlaces web ocultada temporalmente */}
+              {/*
               <Button
                 variant="outline"
                 className="h-auto p-4 flex flex-col items-center space-y-2"
@@ -531,6 +533,7 @@ const AddSourcesDialog = ({
                 <span className="font-medium">Enlace - Sitio web</span>
                 <span className="text-sm text-gray-500">Múltiples URLs a la vez</span>
               </Button>
+              */}
 
               <Button
                 variant="outline"

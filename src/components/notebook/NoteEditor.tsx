@@ -109,7 +109,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
         <div className="p-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-900">
-              {isAIResponse ? 'Respuesta de IA' : 'Nota'}
+              {isAIResponse ? 'Nota generada por CampusLM' : 'Nota'}
             </h3>
             <div className="flex items-center space-x-2">
               {!isAIResponse && !isReadOnly && (
