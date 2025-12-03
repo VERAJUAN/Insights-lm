@@ -535,6 +535,8 @@ const AddSourcesDialog = ({
               </Button>
               */}
 
+              {/* Opción de texto copiado ocultada temporalmente */}
+              {/*
               <Button
                 variant="outline"
                 className="h-auto p-4 flex flex-col items-center space-y-2"
@@ -545,6 +547,7 @@ const AddSourcesDialog = ({
                 <span className="font-medium">Pegar texto - Texto copiado</span>
                 <span className="text-sm text-gray-500">Agregar contenido copiado</span>
               </Button>
+              */}
             </div>
           </div>
         </DialogContent>
