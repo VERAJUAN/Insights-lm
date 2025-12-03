@@ -21,12 +21,31 @@ const Logo = ({ size = 'md', className = '', src, alt }: LogoProps) => {
     lg: '40px'
   };
 
+  // Handle data URLs (base64), relative paths, or regular URLs
+  let imageSrc = src || "/favicon.png";
+  
+  // If it's a data URL (base64) or starts with http/https, use it directly
+  // Otherwise, if it starts with /, it's a relative path from public folder
+  if (src) {
+    if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+      imageSrc = src;
+    } else if (src.startsWith('/')) {
+      imageSrc = src;
+    }
+  }
+
   return (
     <div className={`${sizeClasses[size]} flex items-center justify-center overflow-hidden ${className}`}>
       <img 
-        src={src || "/favicon.png"} 
+        src={imageSrc} 
         alt={alt || "Logo"} 
         style={{ width: iconSizes[size], height: iconSizes[size] }}
+        onError={(e) => {
+          // Fallback to default logo if image fails to load
+          if (imageSrc !== "/favicon.png") {
+            (e.target as HTMLImageElement).src = "/favicon.png";
+          }
+        }}
       />
     </div>
   );

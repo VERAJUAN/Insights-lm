@@ -63,3 +63,6 @@ verify_jwt = false
 
 [functions.process-additional-sources]
 verify_jwt = true
+
+[functions.upload-organization-logo]
+verify_jwt = true
